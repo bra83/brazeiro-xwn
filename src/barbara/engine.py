@@ -30,6 +30,24 @@ class BarbaraEngine:
             if not isinstance(p,dict) or set(p)!={'path','value'}: raise ValueError('invalid_patch_entry')
             validate_patch(p['path'],p['value'])
         return {'narration':narration,'claims':deepcopy(claims),'state_patch':deepcopy(patches)}
+    def _apply_patches(self,state,patches):
+        for p in patches:
+            parts=p['path'].split('.'); root=parts.pop(0)
+            if root.startswith('player_'):
+                target=state.player_state
+                parts.insert(0,root)
+            elif root in {'scene','notes'}:
+                target=getattr(state,root)
+            else:
+                raise ValueError('patch_root_not_committable')
+            if not parts: raise ValueError('patch_requires_leaf')
+            for key in parts[:-1]:
+                current=target.get(key)
+                if current is None: target[key]={}; current=target[key]
+                if not isinstance(current,dict): raise ValueError('patch_path_type_conflict')
+                target=current
+            target[parts[-1]]=deepcopy(p['value'])
+        state.validate()
     def turn(self,state,text,request_id,mechanical=False,importance='normal'):
         self.narrative.target_chars(importance)
         fingerprint=self._fingerprint(state,text,mechanical,importance)
@@ -45,7 +63,9 @@ class BarbaraEngine:
             result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':mode,'world_advanced':mode=='fiction','importance':importance}
             if self.provider:
                 raw=self.recovery.run(lambda:self.provider.generate(text,context,state))
-                result.update(self._validate_provider_output(raw,importance))
+                validated=self._validate_provider_output(raw,importance)
+                self._apply_patches(state,validated['state_patch'])
+                result.update(validated)
         except Exception:
             state.__dict__.clear(); state.__dict__.update(before.__dict__); raise
         self._requests[request_id]=(fingerprint,deepcopy(result)); return deepcopy(result)
