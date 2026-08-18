@@ -5,15 +5,16 @@ from .world import WorldTick
 from .memory import Memory
 from .security import public_view,validate_patch
 from .recovery import RecoveryPolicy
+from .narrative import NarrativePolicy
 
 class BarbaraEngine:
     MAX_NARRATION=20000
-    def __init__(self,provider=None,recovery=None):
-        self.provider=provider; self.rag=RAG(); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self._requests={}
+    def __init__(self,provider=None,recovery=None,narrative=None):
+        self.provider=provider; self.rag=RAG(); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self._requests={}
     def _fingerprint(self,state,text,mechanical): return (state.campaign_id,state.system_id,text,mechanical)
     def narrator_context(self,state,evidence):
         safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]
-        return public_view({'location':state.location,'memory':self.memory.compact_context(state),'rumors':self.world.visible_rumors(state),'evidence':safe})
+        return public_view({'location':state.location,'memory':self.memory.compact_context(state),'rumors':self.world.visible_rumors(state),'evidence':safe,'narrative_policy':self.narrative.narrator_directives()})
     def _validate_provider_output(self,out):
         if isinstance(out,str): out={'narration':out,'claims':[],'state_patch':[]}
         if not isinstance(out,dict): raise ValueError('invalid_provider_output')
@@ -33,10 +34,11 @@ class BarbaraEngine:
             if old!=fingerprint: raise ValueError('request_id_collision')
             return deepcopy(result)
         evidence=self.rag.retrieve(text,state.campaign_id,state.system_id,kinds={'RULE','LORE','MEMORY'},allow_secret=False)
-        self.rules.require(mechanical,evidence); before=state.snapshot()
+        self.rules.require(mechanical,evidence); before=state.snapshot(); mode=self.narrative.classify(text)
         try:
-            self.world.advance(state); context=self.narrator_context(state,evidence)
-            result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text}
+            if self.narrative.advances_world(text): self.world.advance(state)
+            context=self.narrator_context(state,evidence)
+            result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':mode,'world_advanced':mode=='fiction'}
             if self.provider:
                 raw=self.recovery.run(lambda:self.provider.generate(text,context,state))
                 result.update(self._validate_provider_output(raw))
