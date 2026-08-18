@@ -6,29 +6,33 @@ from .memory import Memory
 from .security import public_view,validate_patch
 from .recovery import RecoveryPolicy
 from .narrative import NarrativePolicy
+from .knowledge import KnowledgeBoundary
 
 class BarbaraEngine:
     MAX_NARRATION=20000
-    def __init__(self,provider=None,recovery=None,narrative=None):
-        self.provider=provider; self.rag=RAG(); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self._requests={}
-    def _fingerprint(self,state,text,mechanical): return (state.campaign_id,state.system_id,text,mechanical)
-    def narrator_context(self,state,evidence):
+    def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None):
+        self.provider=provider; self.rag=RAG(); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self._requests={}
+    def _fingerprint(self,state,text,mechanical,importance): return (state.campaign_id,state.system_id,text,mechanical,importance)
+    def narrator_context(self,state,evidence,text='',importance='normal'):
         safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]
-        return public_view({'location':state.location,'memory':self.memory.compact_context(state),'rumors':self.world.visible_rumors(state),'evidence':safe,'narrative_policy':self.narrative.narrator_directives()})
-    def _validate_provider_output(self,out):
+        qcount=self.narrative.question_count(text)
+        return public_view({'location':state.location,'facts':state.facts,'memory':self.memory.compact_context(state),'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'evidence':safe,'narrative_policy':self.narrative.narrator_directives(importance,qcount)})
+    def _validate_provider_output(self,out,importance='normal'):
         if isinstance(out,str): out={'narration':out,'claims':[],'state_patch':[]}
         if not isinstance(out,dict): raise ValueError('invalid_provider_output')
         if set(out)-{'narration','claims','state_patch'}: raise ValueError('unknown_provider_field')
         narration=out.get('narration'); claims=out.get('claims',[]); patches=out.get('state_patch',[])
         if not isinstance(narration,str) or not narration.strip() or len(narration)>self.MAX_NARRATION: raise ValueError('invalid_narration')
+        if len(narration)<self.narrative.minimum_acceptable_chars(importance): raise ValueError('narrativa_resumida_demais')
         if not isinstance(claims,list) or not all(isinstance(x,str) for x in claims): raise ValueError('invalid_claims')
         if not isinstance(patches,list): raise ValueError('invalid_state_patch')
         for p in patches:
             if not isinstance(p,dict) or set(p)!={'path','value'}: raise ValueError('invalid_patch_entry')
             validate_patch(p['path'],p['value'])
         return {'narration':narration,'claims':deepcopy(claims),'state_patch':deepcopy(patches)}
-    def turn(self,state,text,request_id,mechanical=False):
-        fingerprint=self._fingerprint(state,text,mechanical)
+    def turn(self,state,text,request_id,mechanical=False,importance='normal'):
+        self.narrative.target_chars(importance)
+        fingerprint=self._fingerprint(state,text,mechanical,importance)
         if request_id in self._requests:
             old,result=self._requests[request_id]
             if old!=fingerprint: raise ValueError('request_id_collision')
@@ -37,11 +41,11 @@ class BarbaraEngine:
         self.rules.require(mechanical,evidence); before=state.snapshot(); mode=self.narrative.classify(text)
         try:
             if self.narrative.advances_world(text): self.world.advance(state)
-            context=self.narrator_context(state,evidence)
-            result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':mode,'world_advanced':mode=='fiction'}
+            context=self.narrator_context(state,evidence,text,importance)
+            result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':mode,'world_advanced':mode=='fiction','importance':importance}
             if self.provider:
                 raw=self.recovery.run(lambda:self.provider.generate(text,context,state))
-                result.update(self._validate_provider_output(raw))
+                result.update(self._validate_provider_output(raw,importance))
         except Exception:
             state.__dict__.clear(); state.__dict__.update(before.__dict__); raise
         self._requests[request_id]=(fingerprint,deepcopy(result)); return deepcopy(result)
