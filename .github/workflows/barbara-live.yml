@@ -35,7 +35,7 @@ jobs:
           python - <<'PY'
           import json, os, urllib.request, urllib.error
           key=os.environ['GEMINI_API_KEY']
-          model='gemini-2.5-flash'
+          model='gemini-3.6-flash'
           url=f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}'
           body={'contents':[{'parts':[{'text':'Return only JSON: {"barbara":"ok"}'}]}], 'generationConfig':{'responseMimeType':'application/json'}}
           req=urllib.request.Request(url,data=json.dumps(body).encode(),headers={'Content-Type':'application/json'})
