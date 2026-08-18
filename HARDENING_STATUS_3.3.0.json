@@ -1,0 +1,25 @@
+{
+  "project": "Braseiro XWN",
+  "version": "3.3.0",
+  "codename": "DOMAIN ISOLATION HARDENING",
+  "systems": ["WWN", "SWN", "AWN", "CWN"],
+  "tests": {
+    "assertions": 32176,
+    "adversarial_checks": 32000,
+    "javascript_syntax": "pass",
+    "html_missing_refs": 0,
+    "http_core": "8/8"
+  },
+  "isolation": {
+    "domain_generation": "origin-separated",
+    "cross_system_entities": "sanitized",
+    "cross_system_map_fields": "sanitized",
+    "rag": "fail-closed"
+  },
+  "mechanics": {
+    "WWN": "indexed/active",
+    "SWN": "blocked pending corpus homologation",
+    "AWN": "blocked pending corpus homologation",
+    "CWN": "blocked pending corpus homologation"
+  }
+}

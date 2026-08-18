@@ -1,0 +1,40 @@
+BRASEIRO XWN — 3.3.0 DOMAIN ISOLATION HARDENING
+VALIDAÇÃO AUTOMATIZADA — 2026-08-18
+
+RESULTADO: APROVADO COMO CHECKPOINT DE HARDENING
+
+1. TESTES DE ENGINE
+Comando: node tests/test_engine.js
+Resultado: PASS 32176 assertions (32000 adversarial checks)
+
+Cobertura adicional 3.3:
+- quatro sistemas registrados e identidade de save preservada;
+- SWN pointy / WWN-AWN-CWN flat;
+- SWN/AWN/CWN nascem sem terrain/tile/road de WWN;
+- sanitização de NPC e facção canônicos cross-system;
+- sanitização de map poison em saves importados;
+- migração 3.1.0, 3.2.0 e 3.3.0 preserva sistema;
+- RAG fail-closed por proveniência explícita;
+- 4.000 ciclos adversariais x 4 sistemas.
+
+2. SINTAXE JAVASCRIPT
+node --check: systems.js, adapters.js, engine.js, app.js, audioEngineV2.js, gmBridge.js, rules-index.js, hex-library.js, sw.js
+Resultado: APROVADO
+
+3. REFERÊNCIAS HTML
+10 referências locais verificadas; arquivos ausentes: 0
+Resultado: APROVADO
+
+4. SERVIÇO HTTP LOCAL
+index.html 200
+styles.css 200
+app.js 200
+engine.js 200
+systems.js 200
+adapters.js 200
+manifest.webmanifest 200
+sw.js 200
+Resultado: 8/8 HTTP 200
+
+5. LIMITE DESTA BUILD
+SWN/AWN/CWN não aplicam mecânicas específicas sem corpus homologado. O bloqueio é intencional e fail-closed.

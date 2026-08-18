@@ -18,24 +18,9 @@
   }
   async function refineNarrative(ctx){
     if(!enabled())return null;const key=getKey();
-    const prompt=`Você é a VOZ DE MESA do Mestre de um sandbox Worlds Without Number. O motor determinístico já decidiu todos os fatos, regras, posições e consequências abaixo. NÃO acrescente regra, teste, NPC, inimigo, pista, distância, objeto, saída, segredo ou consequência não contida nos fatos. NÃO controle o personagem jogador.
-
-DIREÇÃO ACTUAL PLAY recuperada dos projetos Braseiro: procedimento gera ficção; mundo já estava em movimento; chegada = luz/horário + entrada + atividade atual + reação; NPC entra fazendo algo e só sabe o que sabe; rumor não vira fato; rotina conhecida comprime; ameaça cresce por sinais antes do contato; narração para na primeira incerteza significativa; falha cobra custo/exposição/tempo/posição/complicação em vez de bloquear; Use o padrão Braseiro de actual play: CONTEXTO → ESPAÇO → MOVIMENTO/ATIVIDADE → FOCO → IMPLICAÇÃO → abertura para ação. Normalmente 1 a 3 parágrafos e 350 a 900 caracteres; só amplie quando a cena realmente ganhou peso. Linguagem concreta, oral e jogável. Evite prosa ornamental, metáforas em série, frases que comentem a própria narrativa e explicações do que “importa”. Não explique mecânica e não termine com pergunta artificial.
-
-FATOS CANÔNICOS:
-Local: ${ctx.location}
-Terreno: ${ctx.terrain}
-Dia/hora: ${ctx.day}, ${ctx.time} (${ctx.period})
-Clima: ${ctx.weather}
-Ação do jogador: ${ctx.action||'abertura/continuação'}
-NPCs comprovadamente presentes: ${ctx.npcs||'nenhum'}
-POI conhecido/percebido: ${ctx.poi||'nenhum confirmado'}
-Resolução mecânica já decidida (NÃO narrar números): ${ctx.mechanics||'nenhuma'}
-
-RASCUNHO FACTUAL DO MOTOR:
-${(ctx.scaffold||[]).join('\n\n')}
-
-Reescreva APENAS a narração em português do Brasil, como um mestre falando na mesa: o suficiente para situar, tornar o espaço perceptível, mostrar o que está acontecendo agora e parar antes de decidir pelo jogador. Preserve todos os fatos acima. Retorne só os parágrafos narrativos.`;
+    const systemLabel=ctx.systemLabel||ctx.system||'Without Numbers';
+    const systemGenre=ctx.systemGenre||'sandbox';
+    const prompt=`Você é a VOZ DE MESA do Mestre de ${systemLabel}, um jogo ${systemGenre}. O motor determinístico já decidiu todos os fatos, regras, posições e consequências abaixo. NÃO acrescente regra, teste, NPC, inimigo, pista, distância, objeto, saída, segredo ou consequência não contida nos fatos. NÃO controle o personagem jogador.\n\nDIREÇÃO ACTUAL PLAY recuperada dos projetos Braseiro: procedimento gera ficção; mundo já estava em movimento; chegada = luz/horário + entrada + atividade atual + reação; NPC entra fazendo algo e só sabe o que sabe; rumor não vira fato; rotina conhecida comprime; ameaça cresce por sinais antes do contato; narração para na primeira incerteza significativa; falha cobra custo/exposição/tempo/posição/complicação em vez de bloquear; Use o padrão Braseiro de actual play: CONTEXTO → ESPAÇO → MOVIMENTO/ATIVIDADE → FOCO → IMPLICAÇÃO → abertura para ação. Normalmente 1 a 3 parágrafos e 350 a 900 caracteres; só amplie quando a cena realmente ganhou peso. Linguagem concreta, oral e jogável. Evite prosa ornamental, metáforas em série, frases que comentem a própria narrativa e explicações do que “importa”. Não explique mecânica e não termine com pergunta artificial.\n\nFATOS CANÔNICOS:\nLocal: ${ctx.location}\nTerreno: ${ctx.terrain}\nDia/hora: ${ctx.day}, ${ctx.time} (${ctx.period})\nClima: ${ctx.weather}\nAção do jogador: ${ctx.action||'abertura/continuação'}\nNPCs comprovadamente presentes: ${ctx.npcs||'nenhum'}\nPOI conhecido/percebido: ${ctx.poi||'nenhum confirmado'}\nResolução mecânica já decidida (NÃO narrar números): ${ctx.mechanics||'nenhuma'}\n\nRASCUNHO FACTUAL DO MOTOR:\n${(ctx.scaffold||[]).join('\n\n')}\n\nReescreva APENAS a narração em português do Brasil, como um mestre falando na mesa: o suficiente para situar, tornar o espaço perceptível, mostrar o que está acontecendo agora e parar antes de decidir pelo jogador. Preserve todos os fatos acima. Retorne só os parágrafos narrativos.`;
     let last='';
     for(const m of MODELS){try{const text=await callModel(m,key,prompt);if(text){const p=cleanParagraphs(text);if(p.length)return {paragraphs:p,model:m}}}catch(e){last=String(e?.message||e)}}
     throw new Error(last||'Nenhum modelo respondeu');
