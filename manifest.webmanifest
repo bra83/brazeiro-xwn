@@ -1,0 +1,13 @@
+{
+  "name": "Braseiro XWN — WWN",
+  "short_name": "Braseiro XWN",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#12150f",
+  "theme_color": "#172016",
+  "lang": "pt-BR",
+  "description": "VTT sandbox local para Worlds Without Number com mapa hex, mundo vivo e mestre assistido.",
+  "icons": [
+    {"src":"assets/app-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}

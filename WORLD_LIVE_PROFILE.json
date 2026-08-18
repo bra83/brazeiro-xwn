@@ -1,0 +1,15 @@
+{
+  "profile": "Braseiro XWN World Live",
+  "version": 1,
+  "principles": {
+    "canonical_state_first": true,
+    "npc_offscreen_agendas": true,
+    "npc_location_persists": true,
+    "npc_memory_persists": true,
+    "faction_turn_separate_from_daily_motion": true,
+    "public_and_secret_ledgers_separate": true,
+    "site_mutations_persist": true,
+    "rumor_confidence_separate_from_truth": true,
+    "rules_questions_never_advance_world": true
+  }
+}

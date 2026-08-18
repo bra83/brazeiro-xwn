@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#172016" />
+  <title>Braseiro XWN — WWN v1.5.0</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">BRASEIRO XWN • WORLDS WITHOUT NUMBER</div>
+      <h1 id="campaignName">As Marchas de Orne</h1>
+    </div>
+    <div class="world-meta">
+      <span id="dayLabel">Dia 1</span>
+      <span id="timeLabel">08:00</span>
+      <span id="weatherLabel">Bruma fria</span>
+      <span id="seasonLabel">Outono</span>
+    </div>
+  </header>
+
+  <section class="entity-strip-wrap" aria-label="Personagens presentes">
+    <div class="entity-strip-head">
+      <div><span class="eyebrow">PRESENTES NA CENA • IDENTIDADE PERSISTENTE</span><strong>Tokens</strong></div>
+      <button class="secondary compact" id="geminiPromptBtn">Imagem Gemini</button>
+    </div>
+    <div class="entity-strip" id="entityStrip"></div>
+  </section>
+
+  <main class="app-shell">
+    <section class="panel map-panel" id="mapSection">
+      <div class="panel-title-row">
+        <div>
+          <div class="eyebrow">ATLAS REGIONAL • HEX 6 MILHAS</div>
+          <h2 id="hexTitle">Dorsa</h2>
+        </div>
+        <div class="map-tools">
+          <button class="icon-btn" id="zoomOut" aria-label="Diminuir mapa">−</button>
+          <button class="icon-btn" id="zoomReset" aria-label="Centralizar mapa">◎</button>
+          <button class="icon-btn" id="zoomIn" aria-label="Aumentar mapa">+</button>
+        </div>
+      </div>
+      <div class="map-viewport" id="mapViewport">
+        <div class="hex-map" id="hexMap" aria-label="Mapa hexagonal"></div>
+      </div>
+      <div class="map-status">
+        <div><strong>Selecionado:</strong> <span id="selectedLabel">Dorsa</span></div>
+        <div><strong>Terreno:</strong> <span id="terrainLabel">Campos cultivados</span></div>
+        <div><strong>Estado:</strong> <span id="discoveryLabel">Explorado</span></div>
+      </div>
+      <div class="action-row">
+        <button class="primary" id="travelBtn">Viajar para o hex</button>
+        <button class="secondary" id="exploreBtn">Explorar hex atual</button>
+      </div>
+      <details class="hex-library-details">
+        <summary>Biblioteca de hexes <span id="hexLibraryCount"></span></summary>
+        <div class="hex-library-grid" id="hexLibraryGrid"></div>
+      </details>
+    </section>
+
+    <section class="panel story-panel" id="storySection">
+      <div class="panel-title-row">
+        <div>
+          <div class="eyebrow">MESTRE • NARRATIVA</div>
+          <h2>Cena atual</h2>
+        </div>
+        <div class="story-tools">
+          <button class="secondary compact" id="ttsBtn">▶ Ouvir</button>
+          <button class="ghost compact" id="ttsStopBtn">■ Parar</button>
+        </div>
+      </div>
+      <div class="story-feed" id="storyFeed"></div>
+      <div class="mechanics-box" id="mechanicsBox" hidden>
+        <div class="mechanics-label">RESOLUÇÃO MECÂNICA</div>
+        <pre id="mechanicsText"></pre>
+      </div>
+      <div class="combat-box" id="combatBox" hidden>
+        <div>
+          <div class="eyebrow danger">COMBATE</div>
+          <h3 id="enemyName">Inimigo</h3>
+          <div class="hpbar"><i id="enemyHpBar"></i></div>
+          <span id="enemyHpText"></span>
+        </div>
+        <div class="combat-actions">
+          <button class="danger-btn" id="attackBtn">Atacar</button>
+          <button class="secondary" id="fleeBtn">Fugir</button>
+        </div>
+      </div>
+      <label class="input-label" for="actionInput">AÇÃO / FALA DO PERSONAGEM</label>
+      <div class="input-row speech-row">
+        <textarea id="actionInput" rows="2" placeholder="Ex.: observo a estrada, pergunto a Mara sobre a torre, procuro rastros..."></textarea>
+        <div class="input-actions">
+          <button class="mic-btn" id="actionMic" type="button" aria-label="Falar para texto" title="Falar para texto">🎙</button>
+          <button class="primary" id="sendAction">Enviar</button>
+        </div>
+      </div>
+      <div class="speech-status" id="actionSpeechStatus" aria-live="polite"></div>
+      <div class="suggestions" id="suggestions"></div>
+    </section>
+
+    <section class="rules-panel" id="rulesSection">
+      <div class="blue-head">
+        <div>
+          <div class="eyebrow">CANAL SEPARADO • NÃO AVANÇA A CENA</div>
+          <h2>Regras / dúvidas / intenção</h2>
+        </div>
+        <span class="lock-pill">ESTADO PROTEGIDO</span>
+      </div>
+      <div class="rule-index-status" id="ruleIndexStatus">Índice local: carregando…</div>
+      <div class="rules-answer" id="rulesAnswer">Pergunte algo sobre regras. Esta caixa não move NPCs, não gasta tempo e não entra no diário narrativo.</div>
+      <div class="input-row blue-input speech-row">
+        <textarea id="rulesInput" rows="2" placeholder="Ex.: Como funciona explorar um hex? Qual a dificuldade de um teste difícil?"></textarea>
+        <div class="input-actions">
+          <button class="mic-btn blue-mic" id="rulesMic" type="button" aria-label="Falar pergunta de regra" title="Falar pergunta de regra">🎙</button>
+          <button class="blue-btn" id="sendRule">Consultar</button>
+        </div>
+      </div>
+      <div class="speech-status" id="rulesSpeechStatus" aria-live="polite"></div>
+    </section>
+
+    <section class="panel character-panel" id="characterSection">
+      <div class="panel-title-row"><div><div class="eyebrow">PERSONAGEM</div><h2 id="charName">Elian Vargo</h2></div><span class="level-pill" id="charClass">Expert 1</span></div>
+      <div class="stat-grid">
+        <div><span>PV</span><strong id="hpText">6/6</strong></div>
+        <div><span>CA</span><strong id="acText">13</strong></div>
+        <div><span>AB</span><strong id="abText">+0</strong></div>
+        <div><span>Strain</span><strong id="strainText">0</strong></div>
+        <div><span>Condição</span><strong id="conditionText">Apto</strong></div>
+      </div>
+      <div class="hpbar player"><i id="playerHpBar"></i></div>
+      <h3>Atributos</h3>
+      <div class="attr-grid" id="attrGrid"></div>
+      <h3>Perícias-chave</h3>
+      <div class="skills" id="skillsGrid"></div>
+      <h3>Inventário</h3>
+      <div class="inventory" id="inventoryList"></div>
+    </section>
+
+    <section class="panel world-panel" id="worldSection">
+      <div class="panel-title-row">
+        <div><div class="eyebrow">MUNDO VIVO • ESTADO FORA DE CENA</div><h2>Facções, pessoas e relógios</h2></div>
+        <span class="live-pill">● ATIVO</span>
+      </div>
+      <h3>Facções conhecidas</h3>
+      <div id="factionList"></div>
+      <h3>NPCs conhecidos</h3>
+      <div class="npc-world-list" id="npcWorldList"></div>
+      <h3>Relógios percebidos</h3>
+      <div class="clock-list" id="worldClockList"></div>
+      <h3>Mudanças que chegaram até você</h3>
+      <div class="world-events" id="worldEventList"></div>
+    </section>
+
+    <section class="panel audio-panel" id="audioSection">
+      <div class="panel-title-row"><div><div class="eyebrow">ÁUDIO V2 • PIPELINE FORBIDDEN LANDS</div><h2>Voz e ambiência</h2></div><span id="audioStatus" class="level-pill">Pronto</span></div>
+      <div class="audio-grid">
+        <label>Velocidade TTS <input id="ttsRate" type="range" min="0.85" max="1.45" step="0.01" value="1.18"><output id="ttsRateValue">1.18×</output></label>
+        <label>Volume da voz <input id="ttsVolume" type="range" min="0" max="1" step="0.05" value="1"><output id="ttsVolumeValue">100%</output></label>
+        <label class="toggle-row"><input id="ambientToggle" type="checkbox"> Ambiência procedural sincronizada ao clima/terreno</label>
+        <label>Volume ambiente <input id="ambientVolume" type="range" min="0" max="0.4" step="0.01" value="0.12"><output id="ambientVolumeValue">12%</output></label>
+      </div>
+      <p class="muted-note">Durante a fala, a ambiência é automaticamente reduzida e restaurada ao terminar.</p>
+    </section>
+
+    <section class="panel journal-panel" id="journalSection">
+      <div class="panel-title-row">
+        <div><div class="eyebrow">JOURNAL LEDGER</div><h2>Diário da campanha</h2></div>
+        <div class="save-tools">
+          <button class="secondary compact" id="exportBtn">Exportar JSON</button>
+          <label class="secondary compact file-label">Importar JSON<input type="file" id="importInput" accept="application/json,.json" hidden></label>
+          <button class="ghost compact" id="resetBtn">Reiniciar</button>
+        </div>
+      </div>
+      <div class="journal-list" id="journalList"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button data-target="mapSection">Mapa</button>
+    <button data-target="storySection">Cena</button>
+    <button data-target="rulesSection">Regras</button>
+    <button data-target="characterSection">Ficha</button>
+    <button data-target="journalSection">Diário</button>
+  </nav>
+
+  <dialog class="token-dialog" id="tokenDialog">
+    <form method="dialog" class="token-dialog-card">
+      <div class="panel-title-row"><div><div class="eyebrow">TOKEN PERSISTENTE</div><h2 id="tokenDialogTitle">Escolher token</h2></div><button class="ghost compact" value="cancel">Fechar</button></div>
+      <div class="token-preview" id="tokenPreview"></div>
+      <p>O token fica ligado ao ID canônico do personagem/NPC. Quando ele reaparecer, o mesmo token volta automaticamente.</p>
+      <label class="secondary file-label token-file-label">Escolher imagem do dispositivo<input type="file" id="tokenFileInput" accept="image/*" hidden></label>
+      <button type="button" class="ghost" id="clearTokenBtn">Remover token personalizado</button>
+      <label class="descriptor-field">Descrição visual canônica<textarea id="tokenDescriptor" rows="3"></textarea></label>
+      <button type="button" class="primary" id="saveDescriptorBtn">Salvar identidade</button>
+    </form>
+  </dialog>
+
+  <dialog class="gemini-dialog" id="geminiDialog">
+    <form method="dialog" class="token-dialog-card">
+      <div class="panel-title-row"><div><div class="eyebrow">PROMPT VISUAL CANÔNICO</div><h2>Imagem da cena no Gemini</h2></div><button class="ghost compact" value="cancel">Fechar</button></div>
+      <textarea id="geminiPromptText" rows="12" readonly></textarea>
+      <div class="action-row">
+        <button type="button" class="primary" id="copyGeminiPrompt">Copiar prompt</button>
+        <button type="button" class="secondary" id="downloadGeminiBundle">Baixar pacote JSON + tokens</button>
+      </div>
+      <div id="geminiReferenceList" class="gemini-reference-list"></div>
+    </form>
+  </dialog>
+
+  <script src="hex-library.js"></script>
+  <script src="rules-index.js"></script>
+  <script src="audioEngineV2.js"></script>
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
