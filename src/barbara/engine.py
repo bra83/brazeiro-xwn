@@ -4,11 +4,12 @@ from .rules import RuleGate
 from .world import WorldTick
 from .memory import Memory
 from .security import public_view,validate_patch
+from .recovery import RecoveryPolicy
 
 class BarbaraEngine:
     MAX_NARRATION=20000
-    def __init__(self,provider=None):
-        self.provider=provider; self.rag=RAG(); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self._requests={}
+    def __init__(self,provider=None,recovery=None):
+        self.provider=provider; self.rag=RAG(); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self._requests={}
     def _fingerprint(self,state,text,mechanical): return (state.campaign_id,state.system_id,text,mechanical)
     def narrator_context(self,state,evidence):
         safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]
@@ -36,7 +37,9 @@ class BarbaraEngine:
         try:
             self.world.advance(state); context=self.narrator_context(state,evidence)
             result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text}
-            if self.provider: result.update(self._validate_provider_output(self.provider.generate(text,context,state)))
+            if self.provider:
+                raw=self.recovery.run(lambda:self.provider.generate(text,context,state))
+                result.update(self._validate_provider_output(raw))
         except Exception:
             state.__dict__.clear(); state.__dict__.update(before.__dict__); raise
         self._requests[request_id]=(fingerprint,deepcopy(result)); return deepcopy(result)
