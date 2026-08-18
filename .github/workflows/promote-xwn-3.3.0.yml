@@ -5,12 +5,15 @@ on:
     branches: [main]
     paths:
       - 'releases/xwn-3.3.0-source.tar.gz'
+  issues:
+    types: [opened]
 
 permissions:
   contents: write
 
 jobs:
   promote:
+    if: github.event_name == 'push' || github.event.issue.title == '[automation] Promote XWN 3.3.0'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,14 +21,17 @@ jobs:
           fetch-depth: 0
       - name: Promote source checkpoint
         run: |
+          set -euo pipefail
           tar -xzf releases/xwn-3.3.0-source.tar.gz -C .
       - name: Validate JavaScript
         run: |
+          set -euo pipefail
           for f in systems.js adapters.js engine.js app.js audioEngineV2.js gmBridge.js rules-index.js hex-library.js sw.js; do node --check "$f"; done
       - name: Run engine tests
         run: node tests/test_engine.js
       - name: Commit promoted tree
         run: |
+          set -euo pipefail
           git config user.name 'Braseiro XWN Bot'
           git config user.email 'actions@users.noreply.github.com'
           git add systems.js adapters.js engine.js app.js gmBridge.js index.html manifest.webmanifest sw.js tests/test_engine.js README.md CHANGELOG_3.1.0_MULTISYSTEM.md VALIDACAO_3.1.0_MULTISYSTEM.txt CHANGELOG_3.3.0_DOMAIN_ISOLATION.md VALIDACAO_3.3.0.txt HARDENING_STATUS_3.3.0.json
