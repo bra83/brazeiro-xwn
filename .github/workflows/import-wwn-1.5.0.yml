@@ -1,0 +1,56 @@
+name: Import WWN 1.5.0
+
+on:
+  push:
+    branches:
+      - agent/import-wwn-1.5.0
+    paths:
+      - '.github/workflows/import-wwn-1.5.0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/import-wwn-1.5.0
+          fetch-depth: 0
+      - name: Download exact release ZIP
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/wwn.zip 'https://drive.usercontent.google.com/download?id=1L6WJv8FBE49GScXwHVuxqHrke4WwL5mV&export=download&confirm=t'
+          echo 'b050144e8b8d5b6d9bc7153963ac362a191c2415f3c4225c554b24655fb2cb20  /tmp/wwn.zip' | sha256sum -c -
+      - name: Extract project
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/wwn-import
+          mkdir -p /tmp/wwn-import
+          unzip -q /tmp/wwn.zip -d /tmp/wwn-import
+          SRC=$(find /tmp/wwn-import -mindepth 1 -maxdepth 1 -type d | head -n 1)
+          test -n "$SRC"
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .github -exec rm -rf {} +
+          cp -a "$SRC"/. ./
+      - name: Validate expected files
+        run: |
+          set -euo pipefail
+          test -f index.html
+          test -f app.js
+          test -f engine.js
+          test -f rules-index.js
+          test -f audioEngineV2.js
+          test -f tests/test_engine.js
+          test -d assets/hex_library
+          test "$(find assets/hex_library -type f -name '*.png' | wc -l)" -ge 30
+          node tests/test_engine.js
+      - name: Commit imported build
+        run: |
+          set -euo pipefail
+          git config user.name 'Braseiro XWN Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'Import WWN 1.5.0 World Live' || exit 0
+          git push origin HEAD:agent/import-wwn-1.5.0
