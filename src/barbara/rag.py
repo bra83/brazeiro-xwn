@@ -12,7 +12,14 @@ class RAG:
     def replace_source(self, source_id, docs):
         staged=list(docs)
         if any(d.source_id!=source_id for d in staged): raise ValueError("source_mismatch")
-        self._docs={k:v for k,v in self._docs.items() if k[2]!=source_id}
+        # A source identity is scoped by campaign + system. Reingesting one
+        # campaign must never delete an identically named source elsewhere.
+        scopes={(d.campaign_id,d.system_id) for d in staged}
+        if len(scopes)>1: raise ValueError("mixed_source_scope")
+        if staged:
+            campaign_id, system_id=next(iter(scopes))
+            self._docs={k:v for k,v in self._docs.items()
+                        if not (k[0]==campaign_id and k[1]==system_id and k[2]==source_id)}
         for i,d in enumerate(staged): self._docs[(d.campaign_id,d.system_id,source_id,i)]=d
     def retrieve(self, query, campaign_id, system_id, kinds=None, allow_secret=False, limit=6):
         q=set(re.findall(r"\w+",query.lower()))
