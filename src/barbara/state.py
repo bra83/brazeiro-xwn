@@ -1,19 +1,45 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass,field,asdict
 from copy import deepcopy
+import json
 
 @dataclass
 class CampaignState:
-    campaign_id: str
-    system_id: str
-    tick: int = 0
-    location: str = ""
-    facts: dict = field(default_factory=dict)
-    world_flags: dict = field(default_factory=dict)
-    npcs: dict = field(default_factory=dict)
-    factions: dict = field(default_factory=dict)
-    rumors: list = field(default_factory=list)
-    events: list = field(default_factory=list)
-    memory: list = field(default_factory=list)
-
-    def snapshot(self):
-        return deepcopy(self)
+    campaign_id:str
+    system_id:str
+    tick:int=0
+    location:str=''
+    facts:dict=field(default_factory=dict)
+    world_flags:dict=field(default_factory=dict)
+    npcs:dict=field(default_factory=dict)
+    factions:dict=field(default_factory=dict)
+    rumors:list=field(default_factory=list)
+    events:list=field(default_factory=list)
+    memory:list=field(default_factory=list)
+    clocks:dict=field(default_factory=dict)
+    economy:dict=field(default_factory=dict)
+    weather:dict=field(default_factory=dict)
+    def snapshot(self): return deepcopy(self)
+    def validate(self):
+        if not isinstance(self.campaign_id,str) or not self.campaign_id: raise ValueError('invalid_campaign_id')
+        if not isinstance(self.system_id,str) or not self.system_id: raise ValueError('invalid_system_id')
+        if not isinstance(self.tick,int) or isinstance(self.tick,bool) or self.tick<0: raise ValueError('invalid_tick')
+        if not isinstance(self.location,str): raise ValueError('invalid_location')
+        for name in ('facts','world_flags','npcs','factions','clocks','economy','weather'):
+            if not isinstance(getattr(self,name),dict): raise ValueError('invalid_'+name)
+        for name in ('rumors','events','memory'):
+            if not isinstance(getattr(self,name),list): raise ValueError('invalid_'+name)
+        return True
+    def to_dict(self): self.validate(); return deepcopy(asdict(self))
+    def to_json(self): return json.dumps(self.to_dict(),ensure_ascii=False,sort_keys=True,separators=(',',':'))
+    @classmethod
+    def from_dict(cls,data):
+        if not isinstance(data,dict): raise ValueError('invalid_state_document')
+        allowed={f.name for f in cls.__dataclass_fields__.values()}
+        unknown=set(data)-allowed
+        if unknown: raise ValueError('unknown_state_fields:'+','.join(sorted(unknown)))
+        obj=cls(**deepcopy(data)); obj.validate(); return obj
+    @classmethod
+    def from_json(cls,raw):
+        try: data=json.loads(raw)
+        except (TypeError,json.JSONDecodeError) as e: raise ValueError('invalid_state_json') from e
+        return cls.from_dict(data)
