@@ -1,0 +1,13 @@
+[build-system]
+requires=["setuptools>=69","wheel"]
+build-backend="setuptools.build_meta"
+
+[project]
+name="motor-barbara"
+version="1.0.0rc1"
+requires-python=">=3.11"
+dependencies=[]
+
+[tool.pytest.ini_options]
+pythonpath=["src"]
+testpaths=["tests"]
