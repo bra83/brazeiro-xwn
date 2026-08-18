@@ -53,7 +53,7 @@
         if(visibleRoadDirs.length>=2||(visibleRoadDirs.length===1&&isRoadEndpoint)) visibleRoadDirs.forEach(dir=>{const seg=document.createElement('i');seg.className=`road-segment d${dir}`;b.appendChild(seg)});
         if(hex.explored&&hex.poi){const m=document.createElement('span');m.className='poi-marker';if(hex.poi.image){const img=document.createElement('img');img.src=hex.poi.image;m.appendChild(img)}else m.textContent=hex.poi.icon||'•';b.appendChild(m)}
         if(hex.explored&&hex.poi){const label=document.createElement('span');label.className='hex-label';label.textContent=hex.poi.name;b.appendChild(label)}
-        if(hex.key===currentKey){const m=document.createElement('span');m.className='map-player-token';m.innerHTML=entityTokenContent('player',state.player.name);b.appendChild(m)}
+        if(hex.key===currentKey){const m=document.createElement('span');m.className='map-player-token';m.setAttribute('aria-label',`Posição de ${state.player.name}`);m.title=`Posição de ${state.player.name}`;b.appendChild(m)}
       }
       b.addEventListener('click',()=>{E.selectHex(state,hex.q,hex.r);renderMapMeta();renderMap()});map.appendChild(b);
     });

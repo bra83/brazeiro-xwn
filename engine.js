@@ -1,7 +1,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '3.0.0';
+  const VERSION = '3.0.1';
   const STORAGE_KEY = 'braseiro_xwn_wwn_v300';
   const HEX_RADIUS = 4;
   const AXIAL_DIRS = [
@@ -298,9 +298,9 @@
   function openingScene(state) {
     const mara=state && state.npcs ? state.npcs.mara : null;
     return [
-      `Dorsa desperta ${timePhrase(state || {campaign:{hour:8}})} com a ponte de pedra cortando a bruma como a única coisa sólida num vale ainda indeciso. O cheiro de lenha úmida se mistura ao de sal das carroças, e os primeiros trabalhadores falam baixo para não desperdiçar voz no frio.`,
-      `Perto do portão oriental, uma carroça carregada permanece parada fora da fila. O cavalo está preso, a lona continua amarrada e não há condutor por perto. Ninguém grita por ajuda; o estranho é justamente a maneira como os carregadores contornam o veículo e continuam trabalhando, cada um fingindo que não reparou na ausência.`,
-      `${mara ? 'Mara Tessel, à porta da estalagem, seca uma caneca sem tirar os olhos da carroça. ' : ''}Além dos campos, uma torre sem telhado aparece e some na névoa sobre as colinas. A manhã ainda não decidiu se aquilo é apenas paisagem ou o começo de um problema.`
+      `Dorsa, ${timePhrase(state || {campaign:{hour:8}})}. A bruma ainda cobre o vale e a ponte de pedra concentra o movimento da aldeia: carroças de sal, trabalhadores molhados de sereno e madeira batendo nos portões.`,
+      `No portão leste, uma carroça carregada está parada fora da fila. O cavalo continua preso; a lona, amarrada; o condutor sumiu. Os carregadores passam por ela sem parar, mas desviam os olhos quando chegam perto.`,
+      `${mara ? 'Mara Tessel observa da porta da estalagem com uma caneca na mão. ' : ''}Mais além, entre duas aberturas da névoa, a torre sem telhado nas colinas aparece por alguns segundos e desaparece outra vez.`
     ];
   }
 
@@ -310,7 +310,6 @@
   }
 
   function sceneForHex(hex, state, mode) {
-    const t=TERRAIN[hex.terrain];
     const f=TERRAIN_FICTION[hex.terrain] || TERRAIN_FICTION.plains;
     const weather=String(state.campaign.weather||'').toLowerCase();
     const revisit=Boolean(hex.visitCount && hex.visitCount>1);
@@ -318,33 +317,34 @@
 
     if (mode==='arrival') {
       if (revisit && !(hex.notes||[]).some(n=>n.day>=state.campaign.day-1)) {
-        paragraphs.push(`Você reconhece o terreno antes de reconhecer qualquer detalhe novo. ${f.approach} ${timePhrase(state)}, a rota conhecida permite cortar o que já não exige decisão.`);
+        paragraphs.push(`Você reconhece a rota. ${f.approach} Nada visível obriga a refazer uma leitura que já conhece.`);
       } else {
-        paragraphs.push(`A travessia termina ${timePhrase(state)}. ${f.approach} ${weather.includes('bruma') ? 'A bruma encurta as linhas de visão e faz cada marco surgir tarde, já perto demais para ser apenas pano de fundo.' : f.sound}`);
+        const condition=weather.includes('bruma') ? 'A bruma corta a visão a pouca distância.' : f.sound;
+        paragraphs.push(`${timePhrase(state).replace(/^./,c=>c.toUpperCase())}. ${f.approach} ${condition}`);
       }
     } else if (mode==='explore') {
-      paragraphs.push(`Quando você abandona a passagem mais óbvia e começa a ler o hex como lugar, não como caminho, o terreno muda de escala. ${f.detail}`);
+      paragraphs.push(`Fora da passagem mais óbvia, o terreno mostra outra escala. ${f.detail}`);
     } else {
       paragraphs.push(`${f.approach} ${f.sound}`);
     }
 
     const latest=(hex.notes||[])[hex.notes.length-1];
-    if (latest && latest.day < state.campaign.day) paragraphs.push(`Há uma diferença que não estava aqui na última passagem: ${latest.text}. Não explica o que aconteceu, mas prova que o lugar continuou existindo enquanto você estava longe.`);
+    if (latest && latest.day < state.campaign.day) paragraphs.push(`Algo mudou desde sua última passagem: ${latest.text}.`);
 
     const present=npcsAt(state,hex.key);
     if (present.length) {
-      const activities=present.slice(0,2).map(n=>`${n.name} está ${npcActivity(n,state)}`).join('; ');
-      paragraphs.push(`A cena já estava em andamento antes da sua chegada: ${activities}. Nenhum deles interrompe tudo apenas porque você entrou no quadro.`);
+      const activities=present.slice(0,2).map(n=>`${n.name} ${npcActivity(n,state)}`).join('; ');
+      paragraphs.push(`${activities}. Eles já estavam ocupados antes da sua chegada.`);
     }
 
     if (hex.explored && hex.poi) {
-      paragraphs.push(`${hex.poi.name} deixa de ser um símbolo abstrato no mapa. ${hex.poi.summary} O que importa agora não é que o lugar existe, mas o que você decide fazer com a distância finalmente reduzida a poucos passos.`);
+      paragraphs.push(`${hex.poi.name}: ${hex.poi.summary}`);
     } else if (hex.poi && hex.poi.public && hex.discovered) {
-      paragraphs.push(`${hex.poi.name} é um marco conhecido daqui, mas conhecer o nome não equivale a conhecer o que há dentro.`);
+      paragraphs.push(`${hex.poi.name} é conhecido daqui, mas o interior ainda não foi examinado.`);
     } else if (mode==='explore') {
-      paragraphs.push('A varredura cobre os marcos maiores sem transformar ausência de descoberta em certeza absoluta. O que não se mostrou continua sendo desconhecido, não inexistente.');
+      paragraphs.push('A busca cobre os marcos maiores. O que não apareceu continua desconhecido; não vira prova de ausência.');
     }
-    return paragraphs.slice(0,4);
+    return paragraphs.slice(0,3);
   }
 
   function revealNeighbors(state, center, reason='survey') {
@@ -674,10 +674,10 @@
     state.sceneTitle = hex.poi ? `Explorando ${hex.poi.name}` : `Explorando ${TERRAIN[hex.terrain].label.toLowerCase()}`;
     const narrative = sceneForHex(hex, state, 'explore');
     if (hex.poi) {
-      narrative.push(`Depois de uma busca deliberada, o lugar deixa de ser apenas um ponto no mapa. ${hex.poi.name} se revela como algo que merece atenção própria.`);
+      if (!narrative.some(p=>p.includes(hex.poi.name))) narrative.push(`${hex.poi.name}: ${hex.poi.summary}`);
       addJournal(state, 'descoberta', `${hex.poi.name} foi localizado em ${hex.key}.`);
     } else {
-      narrative.push('A busca cobre os marcos principais do hex. Nada aqui se impõe como sítio maior, embora pequenos detalhes ainda possam escapar a uma varredura comum.');
+      if (!narrative.some(p=>/marcos maiores|busca cobre/i.test(p))) narrative.push('Nenhum sítio maior se impõe nesta varredura; detalhes menores ainda podem existir.');
       addJournal(state, 'exploração', `O hex ${hex.key} foi explorado.`);
     }
     const encounter = encounterCheck(state, hex, 'explore');

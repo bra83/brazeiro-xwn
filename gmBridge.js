@@ -18,9 +18,9 @@
   }
   async function refineNarrative(ctx){
     if(!enabled())return null;const key=getKey();
-    const prompt=`Você é somente a VOZ LITERÁRIA do Mestre de um sandbox Worlds Without Number. O motor determinístico já decidiu todos os fatos, regras, posições e consequências abaixo. NÃO acrescente regra, teste, NPC, inimigo, pista, distância, objeto, saída, segredo ou consequência não contida nos fatos. NÃO controle o personagem jogador.
+    const prompt=`Você é a VOZ DE MESA do Mestre de um sandbox Worlds Without Number. O motor determinístico já decidiu todos os fatos, regras, posições e consequências abaixo. NÃO acrescente regra, teste, NPC, inimigo, pista, distância, objeto, saída, segredo ou consequência não contida nos fatos. NÃO controle o personagem jogador.
 
-DIREÇÃO ACTUAL PLAY recuperada dos projetos Braseiro: procedimento gera ficção; mundo já estava em movimento; chegada = luz/horário + entrada + atividade atual + reação; NPC entra fazendo algo e só sabe o que sabe; rumor não vira fato; rotina conhecida comprime; ameaça cresce por sinais antes do contato; narração para na primeira incerteza significativa; falha cobra custo/exposição/tempo/posição/complicação em vez de bloquear; 1 a 4 parágrafos, concretos e sensoriais, sem prosa enciclopédica, sem explicar mecânica e sem terminar com pergunta artificial.
+DIREÇÃO ACTUAL PLAY recuperada dos projetos Braseiro: procedimento gera ficção; mundo já estava em movimento; chegada = luz/horário + entrada + atividade atual + reação; NPC entra fazendo algo e só sabe o que sabe; rumor não vira fato; rotina conhecida comprime; ameaça cresce por sinais antes do contato; narração para na primeira incerteza significativa; falha cobra custo/exposição/tempo/posição/complicação em vez de bloquear; Use o padrão Braseiro de actual play: CONTEXTO → ESPAÇO → MOVIMENTO/ATIVIDADE → FOCO → IMPLICAÇÃO → abertura para ação. Normalmente 1 a 3 parágrafos e 350 a 900 caracteres; só amplie quando a cena realmente ganhou peso. Linguagem concreta, oral e jogável. Evite prosa ornamental, metáforas em série, frases que comentem a própria narrativa e explicações do que “importa”. Não explique mecânica e não termine com pergunta artificial.
 
 FATOS CANÔNICOS:
 Local: ${ctx.location}
@@ -35,7 +35,7 @@ Resolução mecânica já decidida (NÃO narrar números): ${ctx.mechanics||'nen
 RASCUNHO FACTUAL DO MOTOR:
 ${(ctx.scaffold||[]).join('\n\n')}
 
-Reescreva APENAS a narração, em português do Brasil, preservando todos os fatos acima. Retorne só os parágrafos narrativos.`;
+Reescreva APENAS a narração em português do Brasil, como um mestre falando na mesa: o suficiente para situar, tornar o espaço perceptível, mostrar o que está acontecendo agora e parar antes de decidir pelo jogador. Preserve todos os fatos acima. Retorne só os parágrafos narrativos.`;
     let last='';
     for(const m of MODELS){try{const text=await callModel(m,key,prompt);if(text){const p=cleanParagraphs(text);if(p.length)return {paragraphs:p,model:m}}}catch(e){last=String(e?.message||e)}}
     throw new Error(last||'Nenhum modelo respondeu');

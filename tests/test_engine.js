@@ -6,7 +6,7 @@ let count=0; const ok=(x,msg)=>{assert.ok(x,msg);count++;};
 const eq=(a,b,msg)=>{assert.deepStrictEqual(a,b,msg);count++;};
 
 let s=E.makeInitialState();
-ok(E.VERSION==='3.0.0','version 3');
+ok(E.VERSION==='3.0.1','version 3.0.1');
 ok(E.HEX_RADIUS===4,'radius 4');
 eq(Object.keys(s.hexes).length,61,'61 hexes');
 ok(s.atlas.orientation==='flat','flat orientation');
@@ -56,10 +56,14 @@ const after=JSON.stringify({day:qstate.campaign.day,hour:qstate.campaign.hour,cu
 let legacy=E.makeInitialState();legacy.version='1.5.0';legacy.atlas.radius=3;delete legacy.continuity;delete legacy.world.rumorConfidence;delete legacy.npcs.selka;Object.values(legacy.hexes).forEach(h=>{delete h.tile; h.discovered=true; h.visited=false; h.explored=false});legacy.hexes['0,0'].visited=true;legacy.hexes['0,0'].explored=true;let mig=E.importState(JSON.stringify(legacy));
 eq(Object.keys(mig.hexes).length,61,'migration expands atlas');eq(Object.values(mig.hexes).filter(h=>h.discovered).length,1,'migration removes old radial fog reveal');ok(!!mig.npcs.selka,'migration restores canonical NPCs');ok(mig.continuity&&Array.isArray(mig.continuity.actionLedger),'migration adds continuity');ok(Object.values(mig.hexes).every(h=>h.tile&&h.tile.startsWith('assets/hex_full/')),'migration full bleed tiles');
 
+
+// Narrative quality: table-GM density and no automatic explanatory padding.
+let narr=E.makeInitialState();let arrival=E.sceneForHex(narr.hexes['0,0'],narr,'arrival');ok(arrival.length<=3,'arrival max 3 beats');ok(arrival.join(' ').length<900,'arrival concise enough for live table');ok(!/o que importa agora|transforma.*pano de fundo|merece atenção própria/i.test(arrival.join(' ')),'no self-commentary prose');
+
 // Source/UI static invariants.
 const root=path.resolve(__dirname,'..'); const html=fs.readFileSync(path.join(root,'index.html'),'utf8'),css=fs.readFileSync(path.join(root,'styles.css'),'utf8'),app=fs.readFileSync(path.join(root,'app.js'),'utf8'),sw=fs.readFileSync(path.join(root,'sw.js'),'utf8'),manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.webmanifest'),'utf8')),audio=fs.readFileSync(path.join(root,'audioEngineV2.js'),'utf8');
 for(const p of ['morning','afternoon','night','dawn'])ok(css.includes(`body[data-period="${p}"]`),`theme ${p}`);
-ok(!css.includes('.road-stroke'),'old road stroke removed');ok(css.includes('playerBeacon')&&!css.includes('rotate(45deg);border-right:2px solid var(--accent)'), 'player marker upgraded');ok(app.includes('visibleRoadDirs.length>=2'),'roads require topology');ok(app.includes('launchGeminiForImage'),'direct Gemini flow');ok(app.includes('com.google.android.apps.bard'),'Gemini Android package flow');ok(app.includes('navigator.share(payload)'),'share tokens to Gemini');ok(manifest.share_target?.method==='POST','PWA share target POST');ok(sw.includes('__shared_scene_image__')&&sw.includes('share-target'),'share-back image reception');
+ok(!css.includes('.road-stroke'),'old road stroke removed');ok(css.includes('.map-player-token::before')&&css.includes('background:#090b0c')&&!css.includes('playerBeacon'), 'black meeple player marker');ok(app.includes('visibleRoadDirs.length>=2'),'roads require topology');ok(app.includes('launchGeminiForImage'),'direct Gemini flow');ok(app.includes('com.google.android.apps.bard'),'Gemini Android package flow');ok(app.includes('navigator.share(payload)'),'share tokens to Gemini');ok(manifest.share_target?.method==='POST','PWA share target POST');ok(sw.includes('__shared_scene_image__')&&sw.includes('share-target'),'share-back image reception');
 ok(audio.includes('gemini-3.1-flash-tts-preview')&&audio.includes('gemini-2.5-flash-preview-tts'),'Forbidden Lands TTS chain');ok(audio.includes('Charon'),'Charon voice');ok(audio.includes('320')&&audio.includes('680'),'fast chunk profile');
 for(const tab of ['play','character','journal','rules','world','audio','settings'])ok(html.includes(`data-page="${tab}"`),`tab ${tab}`);
 const ids=[...app.matchAll(/\$\('([^']+)'\)/g)].map(m=>m[1]);const missing=[...new Set(ids)].filter(id=>!new RegExp(`id=["']${id}["']`).test(html));eq(missing,[],'all app DOM ids exist');
