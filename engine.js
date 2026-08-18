@@ -1,9 +1,9 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.5.0';
-  const STORAGE_KEY = 'braseiro_xwn_wwn_v150';
-  const HEX_RADIUS = 3;
+  const VERSION = '3.0.0';
+  const STORAGE_KEY = 'braseiro_xwn_wwn_v300';
+  const HEX_RADIUS = 4;
   const AXIAL_DIRS = [
     { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
     { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
@@ -36,7 +36,7 @@
     const variants=HEX_VARIANTS[terrain] || [];
     if(!variants.length) return TERRAIN[terrain]?.tile || '';
     const id=variants[hashString(`${terrain}:${q},${r}`)%variants.length];
-    return `assets/hex_library/${id}.png`;
+    return `assets/hex_full/${id}.png`;
   }
 
   const POIS = Object.freeze({
@@ -53,14 +53,20 @@
     '-2,2': { name: 'Lago de Orne', kind: 'water', icon: '≈', summary: 'Água escura e imóvel, cercada por salgueiros baixos.' },
     '1,1': { name: 'Pedreira Velha', kind: 'site', icon: '◇', summary: 'Cortes retos na rocha e guindastes de madeira abandonados.' },
     '2,0': { name: 'Muralha dos Três Reis', kind: 'landmark', icon: '▦', summary: 'Trechos de muralha ciclópica seguem a crista das colinas.' },
-    '-1,-1': { name: 'Casa do Salgueiro', kind: 'site', icon: '⌂', summary: 'Uma casa isolada continua soltando fumaça apesar da estrada ter sumido.' }
+    '-1,-1': { name: 'Casa do Salgueiro', kind: 'site', icon: '⌂', summary: 'Uma casa isolada continua soltando fumaça apesar da estrada ter sumido.' },
+    '4,-2': { name: 'Monólitos Brancos', kind: 'landmark', icon: '▥', summary: 'Três pedras claras erguem-se acima do mato; nenhuma face aponta para a mesma direção.' },
+    '3,1': { name: 'Forte Escavado', kind: 'ruin', icon: '▦', summary: 'Um terrapleno antigo acompanha a encosta, com paliçadas novas misturadas à pedra velha.' },
+    '-4,2': { name: 'Poço de Turfa', kind: 'hazard', icon: '◉', summary: 'Uma depressão negra guarda água imóvel e tábuas afundadas de uma passagem esquecida.' },
+    '-2,4': { name: 'Ilha do Sino', kind: 'site', icon: '✚', summary: 'Uma ilhota baixa sustenta as ruínas de um campanário que não deveria ter sobrevivido à água.' },
+    '1,3': { name: 'Solar de Venn', kind: 'site', icon: '⌂', summary: 'Muros de pedra cercam um solar rural quase escondido por árvores antigas.' },
+    '-3,-1': { name: 'Bosque Queimado', kind: 'hazard', icon: '♨', summary: 'Troncos negros permanecem de pé onde o fogo morreu há anos, mas o solo ainda cheira a cinza depois da chuva.' }
   });
 
   const ENEMIES = Object.freeze({
-    ash_scout: { id: 'ash_scout', name: 'Batedor da Cinza', hp: 6, ac: 13, ab: 1, damage: '1d6', morale: 7, shock: 2, shockAC: 13 },
-    grave_robber: { id: 'grave_robber', name: 'Saqueador de Túmulos', hp: 5, ac: 12, ab: 1, damage: '1d6', morale: 6, shock: 1, shockAC: 13 },
-    marsh_hound: { id: 'marsh_hound', name: 'Cão do Brejo', hp: 4, ac: 12, ab: 1, damage: '1d4', morale: 7, shock: 1, shockAC: 12 },
-    road_bandit: { id: 'road_bandit', name: 'Bandido da Estrada', hp: 5, ac: 13, ab: 1, damage: '1d6', morale: 6, shock: 2, shockAC: 13 }
+    ash_scout: { id: 'ash_scout', name: 'Batedor da Cinza', hp: 6, ac: 13, ab: 1, damage: '1d6', morale: 7, instinct: 2, shock: 2, shockAC: 13 },
+    grave_robber: { id: 'grave_robber', name: 'Saqueador de Túmulos', hp: 5, ac: 12, ab: 1, damage: '1d6', morale: 6, instinct: 4, shock: 1, shockAC: 13 },
+    marsh_hound: { id: 'marsh_hound', name: 'Cão do Brejo', hp: 4, ac: 12, ab: 1, damage: '1d4', morale: 7, instinct: 5, shock: 1, shockAC: 12 },
+    road_bandit: { id: 'road_bandit', name: 'Bandido da Estrada', hp: 5, ac: 13, ab: 1, damage: '1d6', morale: 6, instinct: 4, shock: 2, shockAC: 13 }
   });
 
   function key(q, r) { return `${q},${r}`; }
@@ -124,12 +130,34 @@
       '-1,3': 'plains', '0,3': 'plains', '1,2': 'farmland', '2,1': 'hills', '3,0': 'mountains', '0,2': 'farmland', '-1,2': 'plains',
       '-2,0': 'swamp', '0,-2': 'forest', '1,-2': 'forest', '-2,2': 'water'
     };
-    return explicit[k] || 'plains';
+    if (explicit[k]) return explicit[k];
+    // O anel externo usa biomas determinísticos para evitar uma borda monótona de planície.
+    const n = hashString(`biome:${q},${r}`) % 100;
+    if (q >= 3) return n < 58 ? 'mountains' : 'hills';
+    if (r <= -3) return n < 55 ? 'dense_forest' : 'forest';
+    if (q <= -3) return n < 52 ? 'swamp' : (n < 72 ? 'water' : 'plains');
+    if (r >= 3) return n < 42 ? 'water' : (n < 72 ? 'plains' : 'farmland');
+    return n < 22 ? 'forest' : n < 40 ? 'hills' : n < 54 ? 'farmland' : n < 66 ? 'swamp' : 'plains';
   }
 
   function roadFor(q, r) {
-    const roadKeys = new Set(['-1,1', '0,1', '0,0', '0,-1', '1,-1', '2,-1']);
+    // Rotas existem como topologia, não como um risco decorativo solto.
+    const roadKeys = new Set([
+      '-4,2','-3,1','-2,0','-1,0','0,0','1,0','2,0','3,0','3,1',
+      '-1,1','0,1','0,-1','1,-1','2,-1','3,-1','4,-2',
+      '1,1','1,2','1,3'
+    ]);
     return roadKeys.has(key(q, r));
+  }
+
+  function roadConnections(state, hex) {
+    if (!hex || !hex.road) return [];
+    const out=[];
+    AXIAL_DIRS.forEach((d,i)=>{
+      const other=state.hexes[key(hex.q+d.q,hex.r+d.r)];
+      if (other && other.road) out.push(i);
+    });
+    return out;
   }
 
   function generateHexes() {
@@ -144,9 +172,11 @@
           terrain: terrainFor(q, r),
           tile: tileVariantFor(terrainFor(q,r),q,r),
           road: roadFor(q, r),
-          discovered: k === '0,0' || axialDistance({ q, r }, { q: 0, r: 0 }) === 1,
+          discovered: k === '0,0',
           explored: k === '0,0',
           visited: k === '0,0',
+          visitCount: k === '0,0' ? 1 : 0,
+          discoverySource: k === '0,0' ? 'campaign-start' : null,
           poi: POIS[k] ? clone(POIS[k]) : null,
           notes: []
         };
@@ -163,7 +193,7 @@
       seed: hashString('DORSA-V010'),
       rngCursor: 1,
       campaign: { name: 'As Marchas de Orne', system: 'WWN', day: 1, hour: 8, weather: 'Bruma fria', season: 'Outono', worldTurn: 0 },
-      atlas: { id: 'orne-r3', orientation: 'flat', radius: 3, hexMiles: 6, source: 'acervo-compartilhado' },
+      atlas: { id: 'orne-r4', orientation: 'flat', radius: 4, hexMiles: 6, source: 'acervo-compartilhado', fogPolicy: 'enter-only-v2' },
       current: { q: 0, r: 0 },
       selected: { q: 0, r: 0 },
       hexes: generateHexes(),
@@ -178,16 +208,29 @@
         visualDescriptor: 'homem humano adulto, explorador cuidadoso, rosto anguloso, cabelo castanho escuro curto, manto verde-musgo gasto, espada curta e mochila de viagem'
       },
       factions: [
-        { id: 'salt', name: 'Companhia do Sal', force: 2, cunning: 1, wealth: 3, power: 2, location: '0,0', goal: 'Controlar a ponte de Dorsa', progress: 0, clock: 6, known: true },
-        { id: 'bell', name: 'Irmãos do Sino', force: 1, cunning: 2, wealth: 1, power: 1, location: '-1,1', goal: 'Recuperar uma relíquia perdida', progress: 0, clock: 5, known: true },
-        { id: 'ash', name: 'Vigias da Cinza', force: 2, cunning: 2, wealth: 1, power: 2, location: '2,-1', goal: 'Abrir o Passo do Corvo', progress: 0, clock: 7, known: false }
+        { id: 'salt', name: 'Companhia do Sal', force: 2, cunning: 1, wealth: 3, power: 2, location: '0,0', goal: 'Controlar a ponte de Dorsa', progress: 0, clock: 6, known: true, treasure: 4, magic: 'none' },
+        { id: 'bell', name: 'Irmãos do Sino', force: 1, cunning: 2, wealth: 1, power: 1, location: '-1,1', goal: 'Recuperar uma relíquia perdida', progress: 0, clock: 5, known: true, treasure: 2, magic: 'low' },
+        { id: 'ash', name: 'Vigias da Cinza', force: 2, cunning: 2, wealth: 1, power: 2, location: '2,-1', goal: 'Abrir o Passo do Corvo', progress: 0, clock: 7, known: false, treasure: 3, magic: 'low' },
+        { id: 'reed', name: 'Casa dos Juncos', force: 1, cunning: 3, wealth: 2, power: 2, location: '-2,1', goal: 'Controlar as passagens do Brejo do Vidro', progress: 0, clock: 6, known: false, treasure: 3, magic: 'none' },
+        { id: 'crown', name: 'Cartógrafos da Coroa', force: 1, cunning: 2, wealth: 3, power: 2, location: '0,0', goal: 'Mapear as Marchas antes da chegada de um novo intendente', progress: 1, clock: 8, known: true, treasure: 5, magic: 'low' }
       ],
       npcs: {
-        mara: { id:'mara', name: 'Mara Tessel', role: 'estalajadeira', disposition: 1, home:'0,0', location:'0,0', schedule:['0,0'], agenda:'manter a estalagem segura e descobrir por que a Companhia do Sal pressiona os carroceiros', alive:true, lastSeenDay:1, memory:[], visualDescriptor:'mulher humana de meia-idade, cabelo ruivo-escuro preso, sardas, avental de couro sobre roupa vinho, olhar atento e postura prática', knows: ['A Torre de Cinza voltou a mostrar luz à noite.', 'Dois carregadores sumiram no Marco Quebrado.'] },
-        del: { id:'del', name: 'Irmão Del', role: 'escriba itinerante', disposition: 0, home:'0,0', location:'0,0', schedule:['0,0','-1,1','-1,1','0,0','1,-1'], agenda:'copiar inscrições antigas e descobrir a origem do sino enterrado', alive:true, lastSeenDay:1, memory:[], visualDescriptor:'homem humano de trinta e poucos anos, magro, cabelo preto ondulado, barba curta, capuz cinza, bolsa de pergaminhos e dedos manchados de tinta', knows: ['O cemitério é mais antigo que Dorsa.', 'Há marcas novas na pedra do Passo do Corvo.'] },
-        selka: { id:'selka', name:'Selka Venn', role:'batedora da ponte', disposition:0, home:'0,0', location:'1,0', schedule:['1,0','1,0','0,0','1,0','1,-1'], agenda:'mapear movimentos de estranhos sem revelar quem a paga', alive:true, lastSeenDay:null, memory:[], visualDescriptor:'mulher humana jovem, pele morena, trança preta longa, capa marrom curta, arco simples, cicatriz fina na sobrancelha direita', knows:['A mata ao leste tem marcas de fogueiras recentes.', 'A estrada para o Passo do Corvo está sendo observada.'] }
+        mara: { id:'mara', name: 'Mara Tessel', role: 'estalajadeira', disposition: 1, home:'0,0', location:'0,0', schedule:['0,0'], agenda:'manter a estalagem segura e descobrir por que a Companhia do Sal pressiona os carroceiros', activity:'secar uma caneca com um pano enquanto escuta a conversa de duas mesas ao mesmo tempo', alive:true, lastSeenDay:1, memory:[], visualDescriptor:'mulher humana de meia-idade, cabelo ruivo-escuro preso, sardas, avental de couro sobre roupa vinho, olhar atento e postura prática', knows: ['A Torre de Cinza voltou a mostrar luz à noite.', 'Dois carregadores sumiram no Marco Quebrado.'] },
+        del: { id:'del', name: 'Irmão Del', role: 'escriba itinerante', disposition: 0, home:'0,0', location:'0,0', schedule:['0,0','-1,1','-1,1','0,0','1,-1'], agenda:'copiar inscrições antigas e descobrir a origem do sino enterrado', activity:'comparar duas folhas de pergaminho e riscar diferenças com carvão', alive:true, lastSeenDay:1, memory:[], visualDescriptor:'homem humano de trinta e poucos anos, magro, cabelo preto ondulado, barba curta, capuz cinza, bolsa de pergaminhos e dedos manchados de tinta', knows: ['O cemitério é mais antigo que Dorsa.', 'Há marcas novas na pedra do Passo do Corvo.'] },
+        selka: { id:'selka', name:'Selka Venn', role:'batedora da ponte', disposition:0, home:'0,0', location:'1,0', schedule:['1,0','1,0','0,0','1,0','1,-1'], agenda:'mapear movimentos de estranhos sem revelar quem a paga', activity:'afiar uma flecha enquanto observa quem atravessa a ponte', alive:true, lastSeenDay:null, memory:[], visualDescriptor:'mulher humana jovem, pele morena, trança preta longa, capa marrom curta, arco simples, cicatriz fina na sobrancelha direita', knows:['A mata ao leste tem marcas de fogueiras recentes.', 'A estrada para o Passo do Corvo está sendo observada.'] },
+        arven: { id:'arven', name:'Arven Lo', role:'carroceiro de sal', disposition:0, home:'0,0', location:'0,0', schedule:['0,0','0,-1','1,-1','0,0'], agenda:'encontrar o irmão desaparecido sem perder o contrato da Companhia', activity:'reapertar uma correia de couro na carroça, olhando mais para a estrada do que para o trabalho', alive:true, lastSeenDay:1, memory:[], visualDescriptor:'homem humano robusto, quarenta anos, barba curta grisalha, casaco azul desbotado, mãos rachadas de sal', knows:['Uma carroça voltou vazia da estrada norte.', 'Os homens da Companhia perguntam demais sobre quem sai de Dorsa.'] },
+        nera: { id:'nera', name:'Nera Voss', role:'curandeira', disposition:1, home:'0,0', location:'0,0', schedule:['0,0','0,0','-1,1','0,0'], agenda:'repor ervas e descobrir a origem de uma febre que apareceu nos viajantes do sul', activity:'separar folhas secas sobre um pano, descartando as que escureceram nas bordas', alive:true, lastSeenDay:1, memory:[], visualDescriptor:'mulher humana idosa, cabelo branco curto, pele morena, xale azul acinzentado, bolsa de ervas presa à cintura', knows:['A água do Brejo do Vidro deixou dois viajantes febris.', 'Irmão Del perguntou por inscrições anteriores à ponte.'] },
+        torren: { id:'torren', name:'Torren de Rill', role:'lavrador', disposition:0, home:'0,-1', location:'0,-1', schedule:['0,-1','0,-1','0,0','0,-1'], agenda:'impedir que a terra da família seja comprada por atravessadores', activity:'limpar barro de uma enxada com a lâmina de uma faca', alive:true, lastSeenDay:null, memory:[], visualDescriptor:'homem humano jovem, cabelo louro queimado de sol, camisa de linho cru, botas cobertas de barro', knows:['Há pegadas recentes cruzando as valas durante a noite.', 'Alguém tem comprado grãos por preço alto demais para ser normal.'] },
+        vey: { id:'vey', name:'Vey Sarto', role:'mercadora itinerante', disposition:0, home:'0,0', location:'-1,1', schedule:['-1,1','0,0','1,0','0,0'], agenda:'vender mapas incompletos sem admitir de onde vieram', activity:'recontar pequenas moedas sobre uma caixa fechada', alive:true, lastSeenDay:null, memory:[], visualDescriptor:'mulher humana de trinta anos, cabelo castanho raspado de um lado, casaco cinza claro, anéis de cobre, sorriso rápido', knows:['O Marco Quebrado tem uma inscrição que não aparece em cópias antigas.', 'Uma trilha de caçadores evita o Bosque das Lanternas.'] }
       },
       visual: { tokens: {}, sceneHistory: [], geminiExports: 0 },
+      continuity: {
+        actionLedger: [],
+        familiarRoutes: {},
+        sessionResume: {day:1,hour:8,hex:'0,0',summary:'A campanha começou em Dorsa.'},
+        locationRecaps: {},
+        immutableFacts: [{id:'campaign-start',day:1,hour:8,fact:'Elian Vargo está em Dorsa no início da campanha.',source:'engine'}]
+      },
       world: {
         lastProcessedDay: 1,
         publicEvents: [],
@@ -205,8 +248,10 @@
       rumors: [],
       pendingActions: [],
       combat: null,
+      encounter: null,
       lastMechanics: '',
       lastRuleAnswer: '',
+      sceneTitle: 'A estrada para fora de Dorsa',
       narrative: []
     };
     addJournal(state, 'campanha', 'A campanha começou em Dorsa, ao amanhecer do primeiro dia.');
@@ -223,46 +268,95 @@
     if (state.journal.length > 200) state.journal.length = 200;
   }
 
-  function openingScene() {
+  function periodOfDay(hour) {
+    const h=((Number(hour)||0)%24+24)%24;
+    if (h < 5) return 'dawn';
+    if (h < 12) return 'morning';
+    if (h < 18) return 'afternoon';
+    return 'night';
+  }
+
+  function timePhrase(state) {
+    const p=periodOfDay(state.campaign.hour);
+    return p==='dawn' ? 'na madrugada, quando até os ruídos pequenos parecem próximos demais'
+      : p==='morning' ? 'sob a luz fria da manhã'
+      : p==='afternoon' ? 'com a tarde já pesando sobre a estrada'
+      : 'depois que a noite engoliu as distâncias';
+  }
+
+  const TERRAIN_FICTION = Object.freeze({
+    plains:{approach:'O terreno se abre em ondulações de capim e terra baixa, oferecendo distância aos olhos e pouca coisa onde desaparecer.',sound:'O vento corre sem obstáculo e traz sons de muito longe, deformados pela distância.',detail:'Pegadas permanecem legíveis nos trechos de solo úmido, mas o campo aberto cobra de quem prefere não ser visto.'},
+    farmland:{approach:'Valas de drenagem, cercas baixas e árvores antigas dividem a terra em propriedades longas e irregulares.',sound:'Há madeira batendo ao longe, um animal preso em algum cercado e o rumor de trabalho que nunca chega a ficar completamente silencioso.',detail:'Alguns campos estão bem cuidados; outros mostram fileiras abandonadas no meio da estação, como se faltassem mãos.'},
+    forest:{approach:'As copas se aproximam da estrada e quebram a luz em faixas estreitas sobre folhas velhas e raízes expostas.',sound:'Pássaros se calam por trechos, depois recomeçam todos de uma vez em outro ponto da mata.',detail:'O chão oferece rastros demais: animais, botas antigas, galhos partidos e marcas que só ganham sentido quando comparadas.'},
+    dense_forest:{approach:'A mata fecha o horizonte e transforma cada poucos passos numa nova parede de troncos, samambaias e sombra.',sound:'O vento quase não chega ao chão; o que se ouve são folhas roçando, madeira estalando e respirações que parecem altas demais.',detail:'Aqui uma trilha pode existir a cinco metros e continuar invisível até que alguém atravesse exatamente o ângulo certo.'},
+    hills:{approach:'O chão sobe em lombadas de pedra e capim curto. Cada crista entrega uma vista e cobra a exposição de quem a alcança.',sound:'Pedrinhas soltas denunciam movimento antes que uma silhueta apareça contra o céu.',detail:'As depressões entre colinas escondem caminhos, fumaça e gente com a mesma facilidade com que escondem água.'},
+    mountains:{approach:'A pedra começa a decidir a rota. Paredões, fendas e cascalho empurram o caminho para passagens estreitas.',sound:'O vento assobia em rachaduras e devolve ecos curtos, difíceis de localizar.',detail:'Um erro de direção aqui custa mais do que distância; custa altura, fôlego e horas de retorno.'},
+    swamp:{approach:'A água ocupa o caminho em lâminas escuras e o solo firme surge em ilhas pequenas, cobertas por junco e lama.',sound:'Insetos, água mexida e o estalo ocasional de alguma coisa sob a superfície impedem o silêncio completo.',detail:'Nem toda marca na água aponta para quem a fez; corrente fraca e barro mole torcem rastros em poucos minutos.'},
+    water:{approach:'A margem baixa cede sob as botas e a água quase imóvel reflete um céu sempre um pouco mais escuro.',sound:'O som viaja pela superfície: um remo distante, uma ave levantando voo, alguma coisa tocando a margem fora de vista.',detail:'A linha d’água guarda restos trazidos de longe e apaga depressa aquilo que aconteceu perto demais dela.'}
+  });
+
+  function openingScene(state) {
+    const mara=state && state.npcs ? state.npcs.mara : null;
     return [
-      'A manhã encontra Dorsa coberta por uma bruma baixa. A velha ponte de pedra desaparece pela metade dentro do nevoeiro, e carroças atravessam devagar para não assustar os animais.',
-      'Perto do portão oriental, uma carroça de sal permanece parada sem condutor. Ninguém parece tratá-la como emergência, mas os carregadores evitam olhar para ela por tempo demais.',
-      'A estrada segue para os campos e, além deles, sobe na direção de uma torre escura recortada contra as colinas. Você ainda tem o dia inteiro pela frente.'
+      `Dorsa desperta ${timePhrase(state || {campaign:{hour:8}})} com a ponte de pedra cortando a bruma como a única coisa sólida num vale ainda indeciso. O cheiro de lenha úmida se mistura ao de sal das carroças, e os primeiros trabalhadores falam baixo para não desperdiçar voz no frio.`,
+      `Perto do portão oriental, uma carroça carregada permanece parada fora da fila. O cavalo está preso, a lona continua amarrada e não há condutor por perto. Ninguém grita por ajuda; o estranho é justamente a maneira como os carregadores contornam o veículo e continuam trabalhando, cada um fingindo que não reparou na ausência.`,
+      `${mara ? 'Mara Tessel, à porta da estalagem, seca uma caneca sem tirar os olhos da carroça. ' : ''}Além dos campos, uma torre sem telhado aparece e some na névoa sobre as colinas. A manhã ainda não decidiu se aquilo é apenas paisagem ou o começo de um problema.`
     ];
   }
 
-  function sceneForHex(hex, state, mode) {
-    const t = TERRAIN[hex.terrain];
-    const base = [];
-    const weather = state.campaign.weather.toLowerCase();
-    const byTerrain = {
-      plains: 'A terra se abre em ondulações baixas, com capim úmido e longas linhas de visão.',
-      farmland: 'Valas rasas dividem os campos. Cercas de pedra e árvores antigas marcam propriedades que parecem maiores do que seus donos conseguem manter.',
-      forest: 'A estrada se estreita sob copas irregulares. O chão guarda folhas velhas, raízes expostas e marcas que a luz lateral transforma em pistas falsas.',
-      dense_forest: 'A mata fecha o horizonte. Galhos cruzados abafam o vento e obrigam cada escolha de direção a ser consciente.',
-      hills: 'O terreno sobe em lombadas pedregosas. Cada crista oferece visão melhor e, ao mesmo tempo, deixa qualquer viajante mais exposto.',
-      mountains: 'A pedra domina a paisagem. O caminho escolhe por você onde é possível passar, e cada desvio custa tempo.',
-      swamp: 'A água invade o caminho em lâminas rasas. O solo firme aparece em ilhas estreitas, separadas por lama escura.',
-      water: 'A margem é baixa e enlameada. A superfície quase imóvel devolve um céu mais escuro do que deveria.'
-    };
-    if (mode === 'arrival') base.push(`Você entra em ${t.label.toLowerCase()}. ${byTerrain[hex.terrain]}`);
-    else base.push(byTerrain[hex.terrain]);
-    if (hex.road) base.push('Uma estrada antiga atravessa este hex e oferece avanço mais rápido enquanto o piso se mantém transitável.');
-    if (weather.includes('bruma')) base.push('A bruma reduz a distância útil de observação, mas também encobre movimentos discretos.');
-    if (hex.explored && hex.poi) base.push(`${hex.poi.name}: ${hex.poi.summary}`);
-    else if (hex.discovered && hex.poi && hex.poi.public) base.push(`${hex.poi.name} é visível e conhecido daqui.`);
-    const present = npcsAt(state, hex.key);
-    if (present.length) base.push(`${present.map(n=>n.name).join(present.length>1 ? ' e ' : '')} ${present.length>1 ? 'estão' : 'está'} por aqui, cada qual ocupado com seus próprios assuntos.`);
-    const latestNote = Array.isArray(hex.notes) ? hex.notes[hex.notes.length-1] : null;
-    if (latestNote && latestNote.day < state.campaign.day) base.push(`Há uma mudança desde a última passagem: ${latestNote.text}.`);
-    return base;
+  function npcActivity(npc,state) {
+    if (!npc) return '';
+    return npc.activity || `${npc.name} está ocupado com algo que não começou quando você chegou`;
   }
 
-  function revealNeighbors(state, center) {
-    for (const d of AXIAL_DIRS) {
-      const h = state.hexes[key(center.q + d.q, center.r + d.r)];
-      if (h) h.discovered = true;
+  function sceneForHex(hex, state, mode) {
+    const t=TERRAIN[hex.terrain];
+    const f=TERRAIN_FICTION[hex.terrain] || TERRAIN_FICTION.plains;
+    const weather=String(state.campaign.weather||'').toLowerCase();
+    const revisit=Boolean(hex.visitCount && hex.visitCount>1);
+    const paragraphs=[];
+
+    if (mode==='arrival') {
+      if (revisit && !(hex.notes||[]).some(n=>n.day>=state.campaign.day-1)) {
+        paragraphs.push(`Você reconhece o terreno antes de reconhecer qualquer detalhe novo. ${f.approach} ${timePhrase(state)}, a rota conhecida permite cortar o que já não exige decisão.`);
+      } else {
+        paragraphs.push(`A travessia termina ${timePhrase(state)}. ${f.approach} ${weather.includes('bruma') ? 'A bruma encurta as linhas de visão e faz cada marco surgir tarde, já perto demais para ser apenas pano de fundo.' : f.sound}`);
+      }
+    } else if (mode==='explore') {
+      paragraphs.push(`Quando você abandona a passagem mais óbvia e começa a ler o hex como lugar, não como caminho, o terreno muda de escala. ${f.detail}`);
+    } else {
+      paragraphs.push(`${f.approach} ${f.sound}`);
     }
+
+    const latest=(hex.notes||[])[hex.notes.length-1];
+    if (latest && latest.day < state.campaign.day) paragraphs.push(`Há uma diferença que não estava aqui na última passagem: ${latest.text}. Não explica o que aconteceu, mas prova que o lugar continuou existindo enquanto você estava longe.`);
+
+    const present=npcsAt(state,hex.key);
+    if (present.length) {
+      const activities=present.slice(0,2).map(n=>`${n.name} está ${npcActivity(n,state)}`).join('; ');
+      paragraphs.push(`A cena já estava em andamento antes da sua chegada: ${activities}. Nenhum deles interrompe tudo apenas porque você entrou no quadro.`);
+    }
+
+    if (hex.explored && hex.poi) {
+      paragraphs.push(`${hex.poi.name} deixa de ser um símbolo abstrato no mapa. ${hex.poi.summary} O que importa agora não é que o lugar existe, mas o que você decide fazer com a distância finalmente reduzida a poucos passos.`);
+    } else if (hex.poi && hex.poi.public && hex.discovered) {
+      paragraphs.push(`${hex.poi.name} é um marco conhecido daqui, mas conhecer o nome não equivale a conhecer o que há dentro.`);
+    } else if (mode==='explore') {
+      paragraphs.push('A varredura cobre os marcos maiores sem transformar ausência de descoberta em certeza absoluta. O que não se mostrou continua sendo desconhecido, não inexistente.');
+    }
+    return paragraphs.slice(0,4);
+  }
+
+  function revealNeighbors(state, center, reason='survey') {
+    // V3: mover ou explorar NÃO abre automaticamente o anel vizinho.
+    // Esta função só é usada por observação deliberada, terreno alto ou regra futura de linha de visão.
+    if (reason !== 'survey') return [];
+    const revealed=[];
+    for (const d of AXIAL_DIRS) {
+      const h=state.hexes[key(center.q+d.q,center.r+d.r)];
+      if (h && !h.discovered) { h.discovered=true; h.discoverySource='survey'; revealed.push(h.key); }
+    }
+    return revealed;
   }
 
   function advanceHours(state, hours) {
@@ -319,6 +413,37 @@
     }
   }
 
+  function factionCheck(state, attacker, defender, attribute='cunning') {
+    const aRoll=rollDie(state,10),dRoll=rollDie(state,10),a=aRoll+Number(attacker?.[attribute]||0),d=dRoll+Number(defender?.[attribute]||0);
+    return {attribute,attackerRoll:aRoll,defenderRoll:dRoll,attackerTotal:a,defenderTotal:d,success:a>d};
+  }
+
+  function factionGoalAttribute(f){const g=normalizeSearch(f.goal||'');if(/control|ponte|forte|passo|territ/.test(g))return 'force';if(/map|descobr|recuper|segredo|passagem/.test(g))return 'cunning';return 'wealth'}
+
+  function runFactionTurn(state, day=state.campaign.day) {
+    state.campaign.worldTurn += 1;
+    const rivals={salt:'crown',crown:'salt',bell:'ash',ash:'bell',reed:'salt'};
+    const byId=Object.fromEntries(state.factions.map(f=>[f.id,f]));
+    const order=state.factions.map(f=>({f,initiative:rollDie(state,8)})).sort((a,b)=>b.initiative-a.initiative);
+    for(const {f,initiative} of order){
+      const income=Math.ceil((Number(f.wealth||1)/2)+((Number(f.force||1)+Number(f.cunning||1))/4));
+      f.treasure=Math.max(0,Number(f.treasure||0)+income);
+      const defender=byId[rivals[f.id]]||null,attribute=factionGoalAttribute(f),check=defender?factionCheck(state,f,defender,attribute):null;
+      const advanced=!check||check.success;if(advanced)f.progress=Math.min(f.clock||6,(f.progress||0)+1);
+      const action={day,faction:f.id,target:defender?.id||null,attribute,progress:f.progress,initiative,income,check};
+      state.world.factionTraffic.unshift(action);
+      state.world.secretLedger.unshift({day,type:'faction_turn',faction:f.id,target:defender?.id||null,goal:f.goal,progress:f.progress,initiative,income,check});
+      if(f.known){
+        const result=advanced?'ganhou terreno':'encontrou resistência';
+        state.world.publicEvents.unshift({id:`faction-${state.campaign.worldTurn}-${f.id}`,day,text:`Movimentos de ${f.name} indicam que a organização ${result} em torno de “${f.goal}”.`});
+      }
+    }
+    if(state.world.factionTraffic.length>120) state.world.factionTraffic.length=120;
+    if(state.world.publicEvents.length>80) state.world.publicEvents.length=80;
+    if(state.world.secretLedger.length>160) state.world.secretLedger.length=160;
+    return order.map(x=>({id:x.f.id,initiative:x.initiative}));
+  }
+
   function dailyWorldUpdate(state) {
     state.world ||= {lastProcessedDay:state.campaign.day,publicEvents:[],secretLedger:[],factionTraffic:[],siteMutations:[],rumorConfidence:{},clocks:[]};
     const day = state.campaign.day;
@@ -326,16 +451,9 @@
     advanceWorldClocks(state, day);
     mutateWorldSite(state, day);
 
-    // Full faction turns remain slower than ordinary NPC/world motion. The world
-    // moves daily, while strategic faction progress is resolved weekly.
-    if (day % 7 === 0) {
-      state.campaign.worldTurn += 1;
-      const faction = state.factions[state.campaign.worldTurn % state.factions.length];
-      faction.progress = Math.min(faction.clock || 6, (faction.progress || 0) + 1);
-      state.world.factionTraffic.unshift({day,faction:faction.id,location:faction.location,progress:faction.progress});
-      state.world.secretLedger.unshift({day,type:'faction_turn',faction:faction.id,goal:faction.goal,progress:faction.progress});
-      if (faction.known) addJournal(state, 'mundo', `${faction.name} avançou seu objetivo conhecido: ${faction.goal}.`);
-    }
+    // WWN 6.2.0 sugere um turno de facção aproximadamente mensal/entre aventuras.
+    // Movimento de NPCs e relógios continua diário; a camada estratégica não gira toda semana.
+    if (day % 30 === 0) runFactionTurn(state, day);
     const weatherRoll = rollDie(state, 6);
     if (weatherRoll === 1) state.campaign.weather = 'Chuva pesada';
     else if (weatherRoll === 2) state.campaign.weather = 'Vento frio';
@@ -403,10 +521,116 @@
     return clone(ENEMIES.road_bandit);
   }
 
+  function reactionRoll(state, enemy, charismaEligible=true) {
+    const roll = rollDice(state, 2, 6);
+    const cha = charismaEligible ? (state.player.mods.cha || 0) : 0;
+    const total = roll.total + cha;
+    let band = 'normal', label = 'reação esperada para a situação';
+    if (total <= 2) { band = 'aggressive'; label = 'agressivamente hostil'; }
+    else if (total <= 5) { band = 'hostile'; label = 'mais hostil e pouco cooperativo que o esperado'; }
+    else if (total <= 8) { band = 'normal'; label = 'tão hostil ou amigável quanto a situação normalmente sugere'; }
+    else if (total <= 11) { band = 'friendly'; label = 'mais benigno e aberto que o esperado'; }
+    else { band = 'helpful'; label = 'tão amigável e prestativo quanto sua natureza permite'; }
+    return { roll: roll.rolls, raw: roll.total, cha, total, band, label, enemyId: enemy?.id || '' };
+  }
+
+  function reactionClue(enemy, reaction) {
+    if (reaction.band === 'aggressive') return `${enemy.name} já vem para cima sem fingir que existe espaço para conversa; peso, olhar e arma apontam todos na mesma direção.`;
+    if (reaction.band === 'hostile') return `${enemy.name} não ataca de imediato, mas fecha a postura e guarda a melhor posição. Há ameaça suficiente para que qualquer gesto brusco possa decidir o encontro.`;
+    if (reaction.band === 'friendly') return `${enemy.name} mede a distância, mas a tensão diminui um grau: a arma não sobe e a postura deixa uma margem clara para palavras.`;
+    if (reaction.band === 'helpful') return `${enemy.name} parece mais interessado em evitar sangue do que em provocar uma luta e oferece a primeira abertura antes que alguém precise sacar uma arma.`;
+    return `${enemy.name} para para avaliar você. Ainda não há ataque; primeiro vem aquele instante curto em que os dois lados tentam decidir o que o outro pretende.`;
+  }
+
+  function beginEncounter(state, enemy, source) {
+    const reaction = reactionRoll(state, enemy, true);
+    const mechanics = `REAÇÃO — 2d6 (${reaction.roll.join('+')})${reaction.cha ? ` + CAR ${reaction.cha >= 0 ? '+' : ''}${reaction.cha}` : ''} = ${reaction.total}: ${reaction.label}. [WWN SRD 5.2.1]`;
+    const narrative = [reactionClue(enemy, reaction)];
+    state.sceneTitle = `Encontro: ${enemy.name}`;
+    if (reaction.band === 'aggressive') {
+      const combat = startCombat(state, enemy, source);
+      narrative.push(...combat.narrative);
+      return { narrative, mechanics: `${mechanics}\n${combat.mechanics}`, combat: true, reaction };
+    }
+    state.encounter = { enemy: clone(enemy), source, reaction, startedDay: state.campaign.day, startedHour: state.campaign.hour };
+    state.lastMechanics = mechanics;
+    addJournal(state, 'encontro', `${enemy.name}: reação inicial ${reaction.band}.`);
+    return { narrative, mechanics, combat: false, reaction };
+  }
+
+  function resolveEncounterPeacefully(state, narrative, mechanics='') {
+    const name = state.encounter?.enemy?.name || 'O outro lado';
+    state.encounter = null;
+    state.narrative = narrative;
+    state.lastMechanics = mechanics;
+    addJournal(state, 'encontro', `Encontro com ${name} encerrado sem combate.`);
+    return { ok:true, narrative, mechanics };
+  }
+
+  function encounterTextAction(state, text) {
+    const enc = state.encounter;
+    if (!enc) return null;
+    const lower = String(text || '').toLowerCase();
+    const enemy = enc.enemy, reaction = enc.reaction;
+    if (/atac|golpe|espada|saco a arma|saco minha arma/i.test(lower)) {
+      state.encounter = null;
+      const start = startCombat(state, enemy, enc.source || 'encontro');
+      start.narrative.unshift(`Você transforma a distância tensa em decisão: ${enemy.name} reage ao movimento da arma.`);
+      return { ok:true, narrative:start.narrative, mechanics:start.mechanics };
+    }
+    if (/recu|afasto|vou embora|sigo caminho|evito|contorno|deixo passar/i.test(lower)) {
+      if (reaction.total >= 6) return resolveEncounterPeacefully(state,[`${enemy.name} acompanha sua retirada com os olhos, mas não encontra motivo suficiente para transformar distância em perseguição. O encontro fica para trás sem virar batalha.`],'SEM TESTE — a reação atual não oferece oposição significativa à retirada.');
+      const c = skillCheck(state,'sneak','dex',8,0);
+      if (c.success) return resolveEncounterPeacefully(state,[`Você cede terreno sem oferecer a abertura que ${enemy.name} parecia procurar. Quando a distância finalmente quebra a tensão, ninguém corre atrás.`],skillMechanics(c));
+      const narrative=[`Você tenta romper o contato, mas ${enemy.name} acompanha o movimento e corta a saída antes que a distância fique segura. A falha muda a posição; não apaga sua escolha.`];
+      state.narrative=narrative; state.lastMechanics=skillMechanics(c); addJournal(state,'ação',text); return {ok:true,narrative,mechanics:state.lastMechanics};
+    }
+    if (/falo|convers|pergunt|saúdo|saudo|negocio|negócio/i.test(lower)) {
+      const tone = reaction.total <= 5 ? `“Fala rápido e mantém as mãos onde eu possa ver.”` : reaction.total >= 9 ? `“Não vim procurar briga. Se você também não veio, podemos conversar.”` : `“Diga o que quer antes que a situação mude.”`;
+      const narrative=[`${enemy.name} não se torna amistoso por conveniência narrativa; apenas responde dentro do humor já mostrado. ${tone}`,'Uma conversa básica não exige teste social. Só haverá rolagem se você pedir uma concessão que ele tenha motivo real para negar.'];
+      state.narrative=narrative; state.lastMechanics='SEM TESTE SOCIAL — parley básico sob a reação já determinada. [WWN SRD 5.2.0]'; addJournal(state,'ação',text); return {ok:true,narrative,mechanics:state.lastMechanics};
+    }
+    if (/convenc|persuad|suborn|propina|ameaç|intimid|mentir/i.test(lower)) {
+      const diff = reaction.total <= 5 ? 10 : reaction.total >= 9 ? 6 : 8;
+      const c=skillCheck(state,'convince','cha',diff,0);
+      if(c.success) return resolveEncounterPeacefully(state,[`${enemy.name} não muda de personalidade, mas aceita uma saída que preserva o próprio interesse. A tensão se desfaz o bastante para os dois lados seguirem sem sangue.`],skillMechanics(c));
+      const narrative=[`${enemy.name} não compra o argumento. A recusa deixa mais claro o que pesa do outro lado, mas o encontro continua aberto: você pode mudar de oferta, recuar ou assumir o risco de lutar.`];
+      state.narrative=narrative; state.lastMechanics=skillMechanics(c); addJournal(state,'ação',text); return {ok:true,narrative,mechanics:state.lastMechanics};
+    }
+    const narrative=[`${enemy.name} continua diante de você, com a reação inicial ainda valendo. A ação foi registrada sem transformar automaticamente tensão em combate.`];
+    state.narrative=narrative; state.lastMechanics='SEM TESTE — a intenção ainda não criou uma incerteza mecânica resolvível.'; addJournal(state,'ação',text); return {ok:true,narrative,mechanics:state.lastMechanics};
+  }
+
+  function moraleCheck(state, reason='perdendo a luta') {
+    if (!state.combat) return null;
+    const enemy=state.combat.enemy, roll=rollDice(state,2,6), failed=roll.total > (enemy.morale ?? 6);
+    return {roll:roll.rolls,total:roll.total,morale:enemy.morale??6,failed,reason};
+  }
+
+  function instinctCheck(state, reason='caos do combate') {
+    if (!state.combat) return null;
+    const enemy=state.combat.enemy, instinct=enemy.instinct ?? 0, roll=rollDie(state,10), failed=instinct>0 && roll<=instinct;
+    return {roll,instinct,failed,reason};
+  }
+
   function selectHex(state, q, r) {
     if (!state.hexes[key(q, r)]) return { ok: false, reason: 'Hex inexistente.' };
     state.selected = { q, r };
     return { ok: true };
+  }
+
+  function recordActionFact(state, type, text, extra={}) {
+    state.continuity ||= {actionLedger:[],familiarRoutes:{},sessionResume:{},locationRecaps:{},immutableFacts:[]};
+    state.continuity.actionLedger ||= [];
+    const entry={id:`a${state.campaign.day}-${state.campaign.hour}-${state.continuity.actionLedger.length+1}`,day:state.campaign.day,hour:state.campaign.hour,hex:key(state.current.q,state.current.r),type,text:String(text||'').slice(0,360),...extra};
+    state.continuity.actionLedger.push(entry);if(state.continuity.actionLedger.length>300)state.continuity.actionLedger.shift();
+    state.continuity.sessionResume={day:state.campaign.day,hour:state.campaign.hour,hex:entry.hex,summary:entry.text};return entry;
+  }
+
+  function routeKey(a,b){const ak=typeof a==='string'?a:key(a.q,a.r),bk=typeof b==='string'?b:key(b.q,b.r);return [ak,bk].sort().join('<>')}
+  function rememberRoute(state, from, to) {
+    state.continuity ||= {actionLedger:[],familiarRoutes:{},sessionResume:{},locationRecaps:{},immutableFacts:[]};state.continuity.familiarRoutes ||= {};
+    const k=routeKey(from,to),r=state.continuity.familiarRoutes[k]||{uses:0,lastDay:0};r.uses++;r.lastDay=state.campaign.day;state.continuity.familiarRoutes[k]=r;return r;
   }
 
   function travelTo(state, q, r) {
@@ -415,20 +639,22 @@
     if (!dest) return { ok: false, narrative: ['Esse hex não pertence ao atlas atual.'], mechanics: '' };
     if (!isAdjacent(state.current, { q, r })) return { ok: false, narrative: ['O destino não é adjacente. Escolha um dos seis hexes vizinhos.'], mechanics: '' };
 
-    const hours = travelHours(dest, state);
+    const from={...state.current},hours = travelHours(dest, state);
     const journey = advanceTravelTime(state, hours);
     state.current = { q, r };
     state.selected = { q, r };
     dest.discovered = true;
     dest.visited = true;
-    revealNeighbors(state, state.current);
+    dest.visitCount = (dest.visitCount || 0) + 1;
     const hoursLabel = `${Math.ceil(journey.marchingHours)}h de marcha${journey.campNights ? ` + ${journey.campNights} acampamento${journey.campNights > 1 ? 's' : ''}` : ''}`;
     const mechanics = `VIAGEM — 6 milhas; ${TERRAIN[dest.terrain].label}; velocidade base ${TERRAIN[dest.terrain].mph} mph${dest.road ? '; estrada aplicada (máx. 3 mph)' : ''}; ${hoursLabel}. Limite aplicado: até 10h de marcha/dia.`;
     addJournal(state, 'viagem', `Chegada ao hex ${dest.key} (${TERRAIN[dest.terrain].label}).`);
+    const route=rememberRoute(state,from,{q,r});recordActionFact(state,'movement',`Viajei de ${key(from.q,from.r)} para ${dest.key}.`,{from:key(from.q,from.r),to:dest.key,routeUses:route.uses});
+    state.sceneTitle = dest.poi && dest.explored ? dest.poi.name : `Chegada a ${TERRAIN[dest.terrain].label.toLowerCase()}`;
     const narrative = sceneForHex(dest, state, 'arrival');
     const encounter = encounterCheck(state, dest, 'travel');
     if (encounter) {
-      const start = startCombat(state, encounter, 'viagem');
+      const start = beginEncounter(state, encounter, 'viagem');
       narrative.push(...start.narrative);
       return { ok: true, narrative, mechanics: `${mechanics}\n${start.mechanics}` };
     }
@@ -441,9 +667,11 @@
     const days = TERRAIN[hex.terrain].exploreDays;
     advanceDays(state, days);
     hex.explored = true;
+    hex.visitCount = Math.max(1, hex.visitCount || 0);
+    recordActionFact(state,'exploration',`Explorei sistematicamente o hex ${hex.key}.`,{hex:hex.key});
     hex.discovered = true;
-    revealNeighbors(state, state.current);
     const mechanics = `EXPLORAÇÃO — hex de 6 milhas; ${days} dia${days > 1 ? 's' : ''} de reconhecimento (${TERRAIN[hex.terrain].label}).`;
+    state.sceneTitle = hex.poi ? `Explorando ${hex.poi.name}` : `Explorando ${TERRAIN[hex.terrain].label.toLowerCase()}`;
     const narrative = sceneForHex(hex, state, 'explore');
     if (hex.poi) {
       narrative.push(`Depois de uma busca deliberada, o lugar deixa de ser apenas um ponto no mapa. ${hex.poi.name} se revela como algo que merece atenção própria.`);
@@ -455,7 +683,7 @@
     const encounter = encounterCheck(state, hex, 'explore');
     if (encounter) {
       if (hex.poi) hex.poi.encounterResolved = true;
-      const start = startCombat(state, encounter, 'exploração');
+      const start = beginEncounter(state, encounter, 'exploração');
       narrative.push(...start.narrative);
       return { ok: true, narrative, mechanics: `${mechanics}\n${start.mechanics}` };
     }
@@ -484,6 +712,7 @@
     const text = String(rawText || '').trim();
     if (!text) return { ok: false, narrative: [], mechanics: '' };
     if (state.combat) return combatTextAction(state, text);
+    if (state.encounter) return encounterTextAction(state, text);
 
     const lower = text.toLowerCase();
     const current = state.hexes[key(state.current.q, state.current.r)];
@@ -548,9 +777,12 @@
         return completeAction(state, text, narrative, 'SEM TESTE — presença e localização consultadas no estado canônico do mundo.');
       }
       const info = npc.knows[Math.floor(nextRandom(state) * npc.knows.length)];
-      narrative.push(`${npc.name} interrompe o que estava fazendo antes de responder. “${info}”`);
+      const questions=(text.match(/\?/g)||[]).length;
+      narrative.push(`${npc.name} não abandona a própria atividade para virar uma fonte de informação. ${npcActivity(npc,state).replace(/^./,c=>c.toUpperCase())}. Só então olha para você. “${info}”`);
+      if(questions>1) narrative.push(`Você fez ${questions} perguntas. ${npc.name} responde ao que pode sem fingir conhecer o que está fora da própria experiência; o restante fica explicitamente sem resposta em vez de ser descartado.`);
       narrative.push('A conversa continua aberta; uma pergunta comum não exige teste social. Só haverá rolagem quando você tentar obter algo que o NPC tenha motivo real para negar.');
       if (!state.rumors.includes(info)) state.rumors.push(info);
+      state.world.rumorConfidence ||= {};state.world.rumorConfidence[info]={status:'reported',source:npc.id,sourceName:npc.name,heardDay:state.campaign.day,validated:false};
       rememberNpcInteraction(state,npc.id,text);
       addJournal(state, 'rumor', `${npc.name}: ${info}`);
       return completeAction(state, text, narrative, 'SEM TESTE SOCIAL — conversa básica e informação que o NPC está disposto a compartilhar.');
@@ -569,16 +801,18 @@
 
   function completeAction(state, text, narrative, mechanics) {
     state.lastMechanics = mechanics;
+    recordActionFact(state,'player_action',text);
     addJournal(state, 'ação', text);
     state.narrative = narrative;
     return { ok: true, narrative, mechanics };
   }
 
   function startCombat(state, enemy, source) {
+    state.encounter = null;
     const playerInit = rollDie(state, 8) + state.player.mods.dex;
     const enemyInit = rollDie(state, 8);
-    state.combat = { enemy, round: 1, playerTurn: playerInit >= enemyInit, source, initiative: { player: playerInit, enemy: enemyInit }, log: [] };
-    const narrative = [`A tensão vira combate: ${enemy.name} fecha a distância e a cena deixa de ser apenas exploração.`];
+    state.combat = { enemy, round: 1, playerTurn: playerInit >= enemyInit, source, initiative: { player: playerInit, enemy: enemyInit }, log: [], moraleChecked:false, instinctCheckedRounds:[] };
+    const narrative = [`${enemy.name} compromete o corpo com a luta. A distância útil some, os pés procuram terreno firme e cada movimento seguinte passa a ter consequência imediata.`];
     const mechanics = `INICIATIVA — jogador ${playerInit}, inimigo ${enemyInit}. ${state.combat.playerTurn ? 'Você age primeiro.' : `${enemy.name} age primeiro.`}`;
     addJournal(state, 'combate', `Combate iniciado contra ${enemy.name}.`);
     if (!state.combat.playerTurn) {
@@ -614,6 +848,18 @@
       state.lastMechanics = mechanics;
       return { ok: true, narrative, mechanics };
     }
+    if (!state.combat.moraleChecked && enemy.hp <= Math.ceil((ENEMIES[enemy.id]?.hp || enemy.hp) / 2)) {
+      const morale=moraleCheck(state,'ferido e visivelmente perdendo a luta');
+      state.combat.moraleChecked=true;
+      mechanics += `
+MORAL — 2d6 (${morale.roll.join('+')}) = ${morale.total} vs Moral ${morale.morale}: ${morale.failed?'FALHOU':'MANTEVE-SE'}. [WWN SRD 5.3.1]`;
+      if (morale.failed) {
+        narrative.push(`${enemy.name} percebe antes de você precisar provar de novo que a luta deixou de valer a própria vida. A guarda cede e ele procura saída, rendição ou distância em vez de morrer por inércia.`);
+        addJournal(state,'combate',`${enemy.name} perdeu a Moral e abandonou a luta.`);
+        state.combat=null; state.narrative=narrative; state.lastMechanics=mechanics;
+        return {ok:true,narrative,mechanics};
+      }
+    }
     const enemyResult = enemyAttack(state);
     narrative.push(...enemyResult.narrative);
     state.combat.round += 1;
@@ -625,6 +871,23 @@
 
   function enemyAttack(state) {
     const enemy = state.combat.enemy;
+    const round=state.combat.round||1;
+    state.combat.instinctCheckedRounds ||= [];
+    if (round >= 2 && !state.combat.instinctCheckedRounds.includes(round)) {
+      state.combat.instinctCheckedRounds.push(round);
+      const instinct=instinctCheck(state,'pressão e confusão do combate');
+      if(instinct?.failed && enemy.id !== 'marsh_hound') {
+        return {narrative:[`${enemy.name} perde por um instante a leitura limpa da luta. Em vez de explorar a melhor abertura, recua para uma posição que parece segura e desperdiça o momento.`],mechanics:`INSTINTO — d10 ${instinct.roll} vs ${instinct.instinct}: FALHA; ação subótima nesta rodada. [WWN SRD 5.4.1]`};
+      }
+      if(instinct?.failed && enemy.id === 'marsh_hound') {
+        const d20=rollDie(state,20), total=d20+enemy.ab-2, hit=total>=state.player.ac, damage=hit?parseDie(enemy.damage,state).total:0;
+        state.player.hp=Math.max(0,state.player.hp-damage);
+        const narrative=[hit?`${enemy.name} se deixa dominar pelo instinto e salta cedo demais, mas ainda consegue rasgar você na passagem.`:`${enemy.name} se lança num bote precipitado, furioso demais para corrigir a trajetória quando você sai da linha.`];
+        const mechanics=`INSTINTO — d10 ${instinct.roll} vs ${instinct.instinct}: FALHA; bote precipitado. ATAQUE -2 — d20 ${d20} + AB ${enemy.ab} -2 = ${total} vs AC ${state.player.ac}. ${hit?`${damage} dano.`:'Erro.'} [WWN SRD 5.4.1]`;
+        if(state.player.hp<=0){state.player.mortallyWounded=true;state.player.condition='Ferido Mortalmente';state.player.deathRound=6;narrative.push('Você cai Ferido Mortalmente; a luta deixa de ser uma abstração e vira uma corrida de seis rodadas por estabilização.');}
+        return {narrative,mechanics};
+      }
+    }
     const d20 = rollDie(state, 20);
     const total = d20 + enemy.ab;
     const hit = total >= state.player.ac;
@@ -667,7 +930,7 @@
     const lower = text.toLowerCase();
     if (/atac|golpe|espada/i.test(lower)) return playerAttack(state);
     if (/fug|recu|escapar/i.test(lower)) return fleeCombat(state);
-    return { ok: true, narrative: ['Em combate, a V1 aceita ações estruturadas de atacar ou fugir. A intenção foi registrada, mas não foi transformada em uma rolagem inventada.'], mechanics: 'COMBATE — use ATACAR ou FUGIR para resolução mecânica determinística nesta versão.' };
+    return { ok: true, narrative: ['O combate não transforma qualquer frase em uma rolagem automática. A intenção foi registrada, mas precisa corresponder a uma manobra mecanicamente suportada antes que dados sejam lançados.'], mechanics: 'COMBATE — resolução determinística disponível para ATACAR ou FUGIR; outras manobras permanecem sem rolagem inventada.' };
   }
 
   function entitySnapshot(state, entityId) {
@@ -709,7 +972,7 @@
     'pericia':['skill','check'], 'perícia':['skill','check'], 'teste':['skill','check'], 'dificuldade':['difficulty'], 'ataque':['attack'], 'acertar':['attack roll'],
     'iniciativa':['initiative'], 'surpresa':['surprise'], 'choque':['shock'], 'ferido':['mortally wounded'], 'mortal':['mortal injury'], 'estabilizar':['stabilizing'],
     'cura':['healing'], 'viagem':['overland travel'], 'viajar':['overland travel'], 'explorar':['exploring a hex'], 'hex':['hex'], 'forragear':['foraging'],
-    'encontro':['wandering encounters'], 'faccao':['faction'], 'facção':['faction'], 'moral':['morale'], 'instinto':['instinct'], 'reacao':['reaction roll'], 'reação':['reaction roll'],
+    'encontro':['wandering encounters'], 'faccao':['faction'], 'facção':['faction'], 'faccoes':['faction'], 'facções':['faction'], 'moral':['morale'], 'instinto':['instinct'], 'reacao':['reaction roll'], 'reação':['reaction roll'],
     'encumbrancia':['encumbrance'], 'carga':['encumbrance'], 'perseguicao':['chases pursuit'], 'perseguição':['chases pursuit'], 'magia':['magic spellcasting'], 'magica':['magic spellcasting']
   };
 
@@ -754,7 +1017,7 @@
     if(/reacao|reaction/.test(q)) pages.push(79);
     if(/moral|morale/.test(q)) pages.push(80);
     if(/instinto|instinct/.test(q)) pages.push(81);
-    if(/faccao|faction/.test(q)) pages.push(82,83,84);
+    if(/faccao|faccoes|faction/.test(q)) pages.push(82,83,84);
     return [...new Set(pages)];
   }
   function queryRulesIndexed(state, question, index) {
@@ -780,7 +1043,11 @@
     else if (/viagem|viajar|marcha|milhas/.test(q)) answer = 'Viagem terrestre presume até 10 horas de marcha por dia. Velocidades: planície/savana 3 mph; floresta leve/deserto 2; floresta densa/colinas 1,5; pântano 1; montanhas/ermos 0,5. Estrada dobra a velocidade, mas não acima de 3 mph. Mau tempo reduz pela metade. [WWN SRD 2.11.0]';
     else if (/iniciativa/.test(q)) answer = 'Iniciativa padrão é por lado: cada lado rola 1d8 e soma o melhor modificador de Destreza do grupo; maior resultado age primeiro. A ordem não é rerrolada a cada rodada. [WWN SRD 2.4.2]';
     else if (/shock|choque/.test(q)) answer = 'Algumas armas corpo a corpo causam Shock mesmo quando o ataque erra, desde que a AC corpo a corpo do alvo seja igual ou menor que o valor de AC indicado pelo Shock da arma. O modificador de atributo relevante soma ao Shock. Escudo normalmente nega a primeira fonte de Shock sofrida na rodada. [WWN SRD 2.4.6.4]';
-    else if (/ataque|acertar|ac/.test(q)) answer = 'Ataque de personagem: 1d20 + bônus base de ataque + modificador do atributo da arma + perícia de combate relevante. Sem nível-0 na perícia apropriada, a penalidade é -2. Igualar ou superar a AC relevante acerta. [WWN SRD 2.4.5]';
+    else if (/facç(?:ão|ões)|facc(?:ao|oes)|faction/.test(q)) answer = 'Turnos de facção são uma camada estratégica do mundo, normalmente resolvida aproximadamente uma vez por mês ou entre aventuras. As facções têm Força, Astúcia, Riqueza, Tesouro e Assets; recebem renda, pagam manutenção e executam uma ação por turno. Conflitos de facção usam 1d10 + atributo contra 1d10 + atributo e o atacante precisa superar, não apenas igualar, o defensor. [WWN SRD 6.0–6.7]';
+    else if (/reação|reacao|reaction/.test(q)) answer = 'Encontros que não sejam inevitavelmente violentos normalmente recebem uma rolagem de Reação: 2d6, com o modificador de Carisma do personagem que faz a abordagem quando aplicável. 2- é agressivamente hostil; 3–5 hostil; 6–8 esperado; 9–11 mais amistoso; 12+ tão prestativo quanto a natureza permitir. O Mestre deve mostrar sinais dessa reação antes dos personagens agirem. [WWN SRD 5.2.0–5.2.1]';
+    else if (/moral|morale/.test(q)) answer = 'Moral: quando as circunstâncias justificam, role 2d6; se o resultado for maior que o valor de Moral, o NPC falha e tenta fugir, render-se ou interromper a luta conforme a situação. [WWN SRD 5.3.1]';
+    else if (/instinto|instinct/.test(q)) answer = 'Instinto: em gatilhos apropriados, role 1d10; se o resultado for igual ou menor que o valor de Instinto, o NPC cede a um comportamento impulsivo ou subótimo. Personagens de jogador nunca fazem testes de Instinto. [WWN SRD 5.4.1]';
+    else if (/ataque|acertar|ac/.test(q)) answer = 'Ataque de personagem: 1d20 + bônus base de ataque + modificador do atributo da arma + perícia de combate relevante. Sem nível-0 na perícia apropriada, a penalidade é -2. Igualar ou superar a AC relevante acerta. [WWN SRD 2.4.5]';
     else if (/salvamento|save|saving/.test(q)) answer = 'Salvamentos usam 1d20 e precisam igualar ou superar o alvo. Há salvamentos Físico, Evasão, Mental e Sorte. Para PCs, os três primeiros derivam de 16 - nível - melhor modificador de atributo do par pertinente; Sorte é 16 - nível. [WWN SRD 2.2.0]';
     else if (/ferido mortal|ferimento mortal|estabiliz/.test(q)) answer = 'Ao chegar a 0 PV por dano letal, um PC fica Ferido Mortalmente, indefeso e incapaz de agir. Ele morre ao fim da sexta rodada após cair se não for estabilizado. Estabilizar normalmente é uma Ação Principal com Dex/Heal ou Int/Heal, dificuldade 8 + rodadas completas desde a queda; sem kit de cura, +2. [WWN SRD 2.5.1]';
     else if (/round|rodada|turno|cena/.test(q)) answer = 'Cena é uma unidade narrativa curta; combate ocorre em rodadas de cerca de 6 segundos; turnos de exploração complexa duram cerca de 10 minutos. Esses relógios são separados para que perguntas de regra não consumam tempo ficcional. [WWN SRD 2.1.0]';
@@ -794,18 +1061,29 @@
     const parsed = typeof json === 'string' ? JSON.parse(json) : clone(json);
     if (!parsed || !parsed.hexes || !parsed.player || !parsed.campaign) throw new Error('Save inválido.');
     const fresh = makeInitialState();
-    parsed.visual ||= clone(fresh.visual); parsed.visual.tokens ||= {}; parsed.visual.sceneHistory ||= [];
+    parsed.visual ||= clone(fresh.visual); parsed.visual.tokens ||= {}; parsed.visual.sceneHistory ||= []; parsed.visual.sceneImages ||= [];
     parsed.world ||= clone(fresh.world);
+    const oldVersion=String(parsed.version||'0');
+    const mergedHexes=clone(fresh.hexes);
+    for(const [k,h] of Object.entries(parsed.hexes||{})) if(mergedHexes[k]) mergedHexes[k]={...mergedHexes[k],...h};
+    parsed.hexes=mergedHexes;
+    parsed.atlas={...fresh.atlas,...(parsed.atlas||{}),radius:HEX_RADIUS,fogPolicy:'enter-only-v2'};
+    if(/^1\./.test(oldVersion)) {
+      const currentKey=key(parsed.current?.q||0,parsed.current?.r||0);
+      Object.values(parsed.hexes).forEach(h=>{ h.discovered=Boolean(h.visited||h.explored||h.key===currentKey); });
+    }
     parsed.world.publicEvents ||= []; parsed.world.secretLedger ||= []; parsed.world.factionTraffic ||= []; parsed.world.siteMutations ||= []; parsed.world.rumorConfidence ||= {};
     if(!Array.isArray(parsed.world.clocks) || !parsed.world.clocks.length) parsed.world.clocks=clone(fresh.world.clocks);
     parsed.player.visualDescriptor ||= fresh.player.visualDescriptor;
-    Object.values(parsed.hexes).forEach(h=>{ h.notes ||= []; h.tile ||= tileVariantFor(h.terrain,h.q,h.r); });
+    Object.values(parsed.hexes).forEach(h=>{ h.notes ||= []; h.tile = tileVariantFor(h.terrain,h.q,h.r); h.visitCount ||= h.visited ? 1 : 0; });
     const oldNpcs=parsed.npcs||{}; parsed.npcs={};
     for(const [id,def] of Object.entries(fresh.npcs)) parsed.npcs[id]={...clone(def),...(oldNpcs[id]||{})};
     for(const [id,n] of Object.entries(oldNpcs)) if(!parsed.npcs[id]) parsed.npcs[id]={id,...n};
     Object.entries(parsed.npcs).forEach(([id,n])=>{ n.id ||= id; n.memory ||= []; n.alive = n.alive !== false; n.home ||= '0,0'; n.location ||= n.home; n.schedule ||= [n.home]; n.visualDescriptor ||= `${n.name}, ${n.role}`; });
     const freshFactions=Object.fromEntries(fresh.factions.map(f=>[f.id,f]));
-    parsed.factions=(parsed.factions||fresh.factions).map(f=>({...clone(freshFactions[f.id]||{}),...f}));
+    const oldFactionMap=Object.fromEntries((parsed.factions||[]).map(f=>[f.id,f])); parsed.factions=fresh.factions.map(f=>({...clone(f),...(oldFactionMap[f.id]||{})})); for(const [id,f] of Object.entries(oldFactionMap)) if(!freshFactions[id]) parsed.factions.push(f);
+    parsed.continuity ||= clone(fresh.continuity);parsed.continuity.actionLedger ||= [];parsed.continuity.familiarRoutes ||= {};parsed.continuity.sessionResume ||= clone(fresh.continuity.sessionResume);parsed.continuity.locationRecaps ||= {};parsed.continuity.immutableFacts ||= [];
+    parsed.encounter ||= null;
     parsed.version = VERSION;
     parsed.schema = Math.max(2, parsed.schema||1);
     return parsed;
@@ -821,8 +1099,8 @@
 
   const api = {
     VERSION, STORAGE_KEY, HEX_RADIUS, AXIAL_DIRS, DIFFICULTIES, TERRAIN, HEX_VARIANTS, POIS, ENEMIES,
-    key, clone, attrMod, axialDistance, isAdjacent, makeInitialState, selectHex, travelTo, exploreCurrentHex,
-    skillCheck, performAction, queryRules, queryRulesIndexed, searchRuleIndex, playerAttack, fleeCombat, exportState, importState, revealNeighbors, travelHours, advanceTravelTime, npcsAt, rememberNpcInteraction, setEntityToken, entitySnapshot, activeVisualEntities, makeGeminiImageBundle, GameBus
+    key, clone, attrMod, axialDistance, isAdjacent, periodOfDay, roadConnections, openingScene, sceneForHex, makeInitialState, selectHex, travelTo, exploreCurrentHex,
+    skillCheck, reactionRoll, moraleCheck, instinctCheck, beginEncounter, factionCheck, runFactionTurn, recordActionFact, rememberRoute, performAction, queryRules, queryRulesIndexed, searchRuleIndex, playerAttack, fleeCombat, exportState, importState, revealNeighbors, travelHours, advanceTravelTime, npcsAt, rememberNpcInteraction, setEntityToken, entitySnapshot, activeVisualEntities, makeGeminiImageBundle, GameBus
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -1,13 +1,23 @@
 {
-  "name": "Braseiro XWN — WWN",
-  "short_name": "Braseiro XWN",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#12150f",
-  "theme_color": "#172016",
-  "lang": "pt-BR",
-  "description": "VTT sandbox local para Worlds Without Number com mapa hex, mundo vivo e mestre assistido.",
-  "icons": [
-    {"src":"assets/app-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
-  ]
+  "name":"Braseiro XWN — WWN 3.0",
+  "short_name":"Braseiro XWN",
+  "start_url":"./index.html",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#05080a",
+  "theme_color":"#8fc7e8",
+  "lang":"pt-BR",
+  "description":"Mesa viva de Worlds Without Number: atlas hex, Mestre actual-play, regras indexadas, mundo vivo e continuidade visual.",
+  "icons":[{"src":"assets/app-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}],
+  "share_target":{
+    "action":"./share-target/",
+    "method":"POST",
+    "enctype":"multipart/form-data",
+    "params":{
+      "title":"title",
+      "text":"text",
+      "url":"url",
+      "files":[{"name":"image","accept":["image/*"]}]
+    }
+  }
 }
