@@ -1,23 +1,44 @@
-PROTECTED_ROOTS={"campaign_id","system_id","tick","facts","world_flags","npcs","factions","rumors","events"}
+PROTECTED_ROOTS={"campaign_id","system_id","tick","facts","world_flags","npcs","factions","rumors","events","economy","clocks","weather","living_world","authorizations"}
+SENSITIVE_KEYS={"private_agenda","secret","secrets","director_notes","has_private_agenda","private_goal","private_goals","hidden_goal","hidden_goals","knowledge_private","gm_only","director_only"}
+PRIVATE_VISIBILITY={"private","director","gm","gm_only","director_only"}
+_DROP=object()
 
-def public_view(value):
-    if isinstance(value, dict):
-        if value.get("private") is True or value.get("visibility") in {"private","director"}:
-            return None
+def _public(value):
+    if isinstance(value,dict):
+        if value.get("private") is True or str(value.get("visibility","")).lower() in PRIVATE_VISIBILITY:
+            return _DROP
         out={}
         for k,v in value.items():
-            if k in {"private_agenda","secret","secrets","director_notes","has_private_agenda"}: continue
-            sv=public_view(v)
-            if sv is not None: out[k]=sv
+            if str(k).lower() in SENSITIVE_KEYS: continue
+            sv=_public(v)
+            if sv is not _DROP: out[k]=sv
         return out
     if isinstance(value,list):
-        return [x for x in (public_view(v) for v in value) if x is not None]
+        out=[]
+        for v in value:
+            sv=_public(v)
+            if sv is not _DROP: out.append(sv)
+        return out
+    if isinstance(value,tuple):
+        out=[]
+        for v in value:
+            sv=_public(v)
+            if sv is not _DROP: out.append(sv)
+        return tuple(out)
     return value
 
-def validate_patch(path, value):
-    root=path.split(".",1)[0]
-    if root in PROTECTED_ROOTS:
-        raise ValueError(f"protected_state:{root}")
-    if not root.startswith("player_") and root not in {"scene","notes"}:
-        raise ValueError(f"namespace_not_allowed:{root}")
+def public_view(value):
+    cleaned=_public(value)
+    # Top-level private objects become an empty public object instead of None,
+    # avoiding accidental fallback to the original unsanitized value by callers.
+    return {} if cleaned is _DROP else cleaned
+
+def validate_patch(path,value):
+    if not isinstance(path,str) or not path or path.startswith('.') or '..' in path:
+        raise ValueError('invalid_patch_path')
+    parts=path.split('.')
+    if any(not p or p.startswith('_') for p in parts): raise ValueError('invalid_patch_path')
+    root=parts[0]
+    if root in PROTECTED_ROOTS: raise ValueError(f"protected_state:{root}")
+    if not root.startswith("player_") and root not in {"scene","notes"}: raise ValueError(f"namespace_not_allowed:{root}")
     return True
