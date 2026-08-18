@@ -7,24 +7,25 @@ from .security import public_view,validate_patch
 from .recovery import RecoveryPolicy
 from .narrative import NarrativePolicy
 from .knowledge import KnowledgeBoundary
+from .grounding import ClaimGrounding
 
 class BarbaraEngine:
     MAX_NARRATION=20000
-    def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None):
-        self.provider=provider; self.rag=RAG(); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self._requests={}
+    def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None):
+        self.provider=provider; self.rag=RAG(); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self._requests={}
     def _fingerprint(self,state,text,mechanical,importance): return (state.campaign_id,state.system_id,text,mechanical,importance)
     def narrator_context(self,state,evidence,text='',importance='normal'):
         safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]
         qcount=self.narrative.question_count(text)
         return public_view({'location':state.location,'facts':state.facts,'memory':self.memory.compact_context(state),'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'evidence':safe,'narrative_policy':self.narrative.narrator_directives(importance,qcount)})
-    def _validate_provider_output(self,out,importance='normal'):
+    def _validate_provider_output(self,out,state,evidence,importance='normal'):
         if isinstance(out,str): out={'narration':out,'claims':[],'state_patch':[]}
         if not isinstance(out,dict): raise ValueError('invalid_provider_output')
         if set(out)-{'narration','claims','state_patch'}: raise ValueError('unknown_provider_field')
         narration=out.get('narration'); claims=out.get('claims',[]); patches=out.get('state_patch',[])
         if not isinstance(narration,str) or not narration.strip() or len(narration)>self.MAX_NARRATION: raise ValueError('invalid_narration')
         if len(narration)<self.narrative.minimum_acceptable_chars(importance): raise ValueError('narrativa_resumida_demais')
-        if not isinstance(claims,list) or not all(isinstance(x,str) for x in claims): raise ValueError('invalid_claims')
+        claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state))
         if not isinstance(patches,list): raise ValueError('invalid_state_patch')
         for p in patches:
             if not isinstance(p,dict) or set(p)!={'path','value'}: raise ValueError('invalid_patch_entry')
@@ -63,7 +64,7 @@ class BarbaraEngine:
             result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':mode,'world_advanced':mode=='fiction','importance':importance}
             if self.provider:
                 raw=self.recovery.run(lambda:self.provider.generate(text,context,state))
-                validated=self._validate_provider_output(raw,importance)
+                validated=self._validate_provider_output(raw,state,evidence,importance)
                 self._apply_patches(state,validated['state_patch'])
                 result.update(validated)
         except Exception:
