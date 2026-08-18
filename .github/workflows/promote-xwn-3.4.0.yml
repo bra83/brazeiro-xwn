@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'releases/xwn-3.4.0-promotion.tar.gz'
+      - 'releases/xwn-3.4.0-trigger.txt'
 
 permissions:
   contents: write
