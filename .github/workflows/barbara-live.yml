@@ -1,0 +1,51 @@
+name: Barbara validation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: python -m pip install -U pip pytest && pip install -e .
+      - name: Unit and regression tests
+        run: pytest -q
+      - name: Gemini secret preflight
+        run: |
+          python - <<'PY'
+          import os
+          assert os.getenv('GEMINI_API_KEY'), 'GEMINI_API_KEY secret ausente'
+          print('GEMINI_API_KEY presente')
+          PY
+      - name: Gemini live smoke
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request, urllib.error
+          key=os.environ['GEMINI_API_KEY']
+          model='gemini-2.5-flash'
+          url=f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}'
+          body={'contents':[{'parts':[{'text':'Return only JSON: {"barbara":"ok"}'}]}], 'generationConfig':{'responseMimeType':'application/json'}}
+          req=urllib.request.Request(url,data=json.dumps(body).encode(),headers={'Content-Type':'application/json'})
+          try:
+              with urllib.request.urlopen(req, timeout=45) as r:
+                  data=json.load(r)
+          except urllib.error.HTTPError as e:
+              raise SystemExit(f'Gemini HTTP {e.code}: {e.read().decode()[:1000]}')
+          text=data['candidates'][0]['content']['parts'][0]['text']
+          parsed=json.loads(text)
+          assert parsed.get('barbara')=='ok', parsed
+          print('Gemini live OK:', model)
+          PY
