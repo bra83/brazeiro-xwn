@@ -14,11 +14,14 @@ from .adapters import AdapterRegistry
 
 class BarbaraEngine:
     MAX_NARRATION=20000
+    MAX_REQUEST_LOG=1000
     _RETRIEVAL_HINTS={'combat':'combat attack ataque ataco golpe strike fight damage dano defense defesa','travel':'travel journey viagem viajo road estrada trail trilha movement movimento','investigation':'investigation investigate investigação exam examine examino search procura clue pista perception percepção','dialogue':'dialogue social conversa persuasion persuasão reaction reação influence influência','action':'action ação check teste skill perícia ability habilidade'}
     def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None,rag=None,rag_db_path=None,embedder=None,telemetry=None,adapters=None):
         if rag is not None and rag_db_path is not None:raise ValueError('rag_configuration_conflict')
-        self.provider=provider; self.rag=rag if rag is not None else RAG(rag_db_path); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self.adapters=adapters or AdapterRegistry(); self._requests={}
-    def _fingerprint(self,state,text,mechanical,importance):return (state.campaign_id,state.system_id,text,mechanical,importance)
+        self.provider=provider; self.rag=rag if rag is not None else RAG(rag_db_path); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self.adapters=adapters or AdapterRegistry()
+    def _fingerprint(self,state,text,mechanical,importance):return [state.campaign_id,state.system_id,text,mechanical,importance]
+    def _validate_request_id(self,request_id):
+        if not isinstance(request_id,str) or not request_id or len(request_id)>160:raise ValueError('invalid_request_id')
     def _retrieval_query(self,text,plan,mechanical=False):
         q=str(text)
         if mechanical and plan.get('mode')=='fiction':
@@ -44,8 +47,7 @@ class BarbaraEngine:
         safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]; qcount=self.narrative.question_count(text); world=self._public_world_context(state); memories=self.memory.compact_context(state,query=text,location=state.location)
         return public_view({'location':state.location,'facts':state.facts,'memory':memories,'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'site':world['site'],'public_ledger':world['ledger'],'evidence':safe,'system_profile':self._system_profile(state),'narrative_policy':self.narrative.narrator_directives(importance,qcount,turn_plan)})
     def _validate_provider_output(self,out,state,evidence,context,user_text,importance='normal'):
-        legacy_string=isinstance(out,str)
-        legacy_opt_out=bool(legacy_string and getattr(self.provider,'legacy_text',False))
+        legacy_string=isinstance(out,str); legacy_opt_out=bool(legacy_string and getattr(self.provider,'legacy_text',False))
         if legacy_string:out={'narration':out,'claims':[],'state_patch':[]}
         if not isinstance(out,dict):raise ValueError('invalid_provider_output')
         if set(out)-{'narration','claims','state_patch'}:raise ValueError('unknown_provider_field')
@@ -53,9 +55,7 @@ class BarbaraEngine:
         if not isinstance(narration,str) or not narration.strip() or len(narration)>self.MAX_NARRATION:raise ValueError('invalid_narration')
         if len(narration)<self.narrative.minimum_acceptable_chars(importance):raise ValueError('narrativa_resumida_demais')
         self.narrative.validate_player_agency(user_text,narration)
-        if not legacy_opt_out:
-            self.narrative.validate_response_coverage(user_text,narration)
-            self.narrative.validate_scene_ending(narration,importance)
+        if not legacy_opt_out:self.narrative.validate_response_coverage(user_text,narration); self.narrative.validate_scene_ending(narration,importance)
         claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state),public_context=context)
         if not isinstance(patches,list):raise ValueError('invalid_state_patch')
         for p in patches:
@@ -76,12 +76,20 @@ class BarbaraEngine:
                 target=current
             target[parts[-1]]=deepcopy(p['value'])
         state.validate()
+    def _remember_request(self,state,request_id,fingerprint,result):
+        state.request_log[request_id]={'fingerprint':deepcopy(fingerprint),'result':deepcopy(result)}
+        if len(state.request_log)>self.MAX_REQUEST_LOG:
+            victim=min(state.request_log,key=lambda rid:(int(state.request_log[rid].get('result',{}).get('tick',0)),rid))
+            if victim!=request_id:state.request_log.pop(victim,None)
+            else:
+                others=[rid for rid in state.request_log if rid!=request_id]
+                if others:state.request_log.pop(min(others,key=lambda rid:(int(state.request_log[rid].get('result',{}).get('tick',0)),rid)),None)
     def turn(self,state,text,request_id,mechanical=False,importance='normal'):
-        plan=self.narrative.turn_plan(text,mechanical,importance); profile=self._system_profile(state); fingerprint=self._fingerprint(state,text,mechanical,importance)
-        if request_id in self._requests:
-            old,result=self._requests[request_id]
-            if old!=fingerprint:raise ValueError('request_id_collision')
-            self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id); return deepcopy(result)
+        self._validate_request_id(request_id); state.validate(); plan=self.narrative.turn_plan(text,mechanical,importance); profile=self._system_profile(state); fingerprint=self._fingerprint(state,text,mechanical,importance)
+        if request_id in state.request_log:
+            entry=state.request_log[request_id]
+            if entry['fingerprint']!=fingerprint:raise ValueError('request_id_collision')
+            self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id); return deepcopy(entry['result'])
         before=state.snapshot()
         try:
             retrieval_query=self._retrieval_query(text,plan,mechanical); query_vector=self._query_vector(retrieval_query); evidence=self.rag.retrieve(retrieval_query,state.campaign_id,state.system_id,kinds={'RULE','LORE','MEMORY'},allow_secret=False,query_vector=query_vector); self.rules.require(mechanical,evidence)
@@ -89,6 +97,7 @@ class BarbaraEngine:
             context=self.narrator_context(state,evidence,text,importance,plan); result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':plan['mode'],'world_advanced':plan['world_advances'],'importance':importance,'system_profile':profile,'turn_plan':deepcopy(plan),'presentation':deepcopy(plan['channels'])}
             if self.provider:
                 raw=self.recovery.run(lambda:self.provider.generate(text,context,state)); validated=self._validate_provider_output(raw,state,evidence,context,text,importance); self._apply_patches(state,validated['state_patch']); result.update(validated)
+            self._remember_request(state,request_id,fingerprint,result); state.validate()
         except Exception as exc:
             state.__dict__.clear(); state.__dict__.update(before.__dict__); self.telemetry.record('reject',self._error_code(exc),campaign=state.campaign_id,system=state.system_id); raise
-        self._requests[request_id]=(fingerprint,deepcopy(result)); self.telemetry.record('turn','ok',campaign=state.campaign_id,system=state.system_id,mode=result['mode']); return deepcopy(result)
+        self.telemetry.record('turn','ok',campaign=state.campaign_id,system=state.system_id,mode=result['mode']); return deepcopy(result)
