@@ -4,7 +4,7 @@ from .state import CampaignState
 
 class HostBridge:
     """Stable JSON boundary for Android/desktop hosts integrating Barbara 1.0."""
-    REQUEST_FIELDS={'text','request_id','mechanical','importance','resolution'}
+    REQUEST_FIELDS={'text','request_id','mechanical','importance','resolution','expected_state_version'}
     def __init__(self,engine):
         self.engine=engine
     def new_campaign(self,campaign_id,system_id,**initial):
@@ -17,7 +17,7 @@ class HostBridge:
         text=request['text']; request_id=request['request_id']
         if not isinstance(text,str) or not text.strip(): raise ValueError('invalid_host_text')
         state=CampaignState.from_json(state_json)
-        result=self.engine.turn(state,text,request_id,mechanical=request.get('mechanical',False),importance=request.get('importance','normal'),resolution=deepcopy(request.get('resolution')))
+        result=self.engine.turn(state,text,request_id,mechanical=request.get('mechanical',False),importance=request.get('importance','normal'),resolution=deepcopy(request.get('resolution')),expected_state_version=request.get('expected_state_version'))
         return {'state':state.to_json(),'result':deepcopy(result)}
     def turn_json(self,state_json,request_json):
         try: request=json.loads(request_json)
