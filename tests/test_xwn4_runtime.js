@@ -31,20 +31,15 @@ has(E.queryRules(s,'Como funciona perícia?'),'2d6');has(E.queryRules(s,'Como fu
 let ssk=E.skillCheck(s,'shoot','dex',8,0);eq(ssk.roll.length,2);
 let charswn=E.exportCharacter(s);let cross=E.makeInitialState('WWN'),crossBlocked=false;try{E.importCharacter(cross,charswn)}catch(_){crossBlocked=true}ok(crossBlocked,'cross-system character import accepted');
 
-const enemies=Array.from({length:12},(_,i)=>({id:`e${i}`,name:`Hostil ${i}`,hp:8,ac:13,ab:1,attrs:{dex:10,str:10},skills:{shoot:0,stab:0},weapon:{name:'Carabina',damage:'1d8',skill:'shoot',attr:'dex',normalRange:100,maxRange:300,kind:'ranged',twoHanded:true}}));
+const enemies=Array.from({length:12},(_,i)=>({id:`e${i}`,name:`Hostil ${i}`,hp:100,ac:13,ab:1,attrs:{dex:10,str:10},skills:{shoot:0,stab:0},weapon:{name:'Carabina',damage:'1d8',skill:'shoot',attr:'dex',normalRange:100,maxRange:300,kind:'ranged',twoHanded:true}}));
 let combat=E.startSWNTactical(s,enemies,{cover:[{x:5,y:2,grade:'half'}],obstacles:[{x:0,y:0}]});eq(combat.board.width,11);eq(combat.board.height,11);eq(combat.actors.length,13);let coords=new Set(combat.actors.map(a=>`${a.x},${a.y}`));eq(coords.size,combat.actors.length,'actors overlap');ok(combat.actors.every(a=>Number.isFinite(a.initiative)));
 let pc=combat.actors.find(a=>a.id==='player'),target=combat.actors.find(a=>a.id==='e0');eq(target.x,5);eq(target.y,2);let ar=E.swAttack(s,'player','e0');eq(ar.penalty,-2,'half cover not applied');
-// Adjacent one-handed pistol is allowed at -4; two-handed ranged is blocked.
 pc.x=5;pc.y=5;target.x=6;target.y=5;pc.weapon.twoHanded=false;pc.weapon.kind='ranged';pc.weapon.normalRange=100;pc.weapon.maxRange=300;let close=E.swAttack(s,'player','e0');ok(close.ok);ok(close.penalty<=-4,'one-handed ranged melee penalty missing');pc.weapon.twoHanded=true;let blocked=E.swAttack(s,'player','e0');ok(!blocked.ok&&blocked.reason==='arma_duas_maos_em_melee');pc.weapon.twoHanded=false;
-// Untrained weapon use is -2, plus Dex +1: total = d20 -1 when no other penalties.
 target.x=5;target.y=2;combat.board.cover=[];pc.x=5;pc.y=8;pc.skills.shoot=-1;let untrained=E.swAttack(s,'player','e0');eq(untrained.total,untrained.d20-1,'untrained attack math wrong');
-// Total Defense grants +2 AC and suppresses melee Shock on a miss.
 let baseAc=pc.ac;ok(E.totalDefense(s,'player'));eq(pc.ac,baseAc+2);let melee=combat.actors.find(a=>a.id==='e1');melee.x=pc.x;melee.y=pc.y-1;melee.ab=-100;melee.skills={stab:0};melee.weapon={name:'Cassetete',damage:'1d6',skill:'stab',attr:'str',kind:'melee',shock:3,shockAC:20};let defensive=E.swAttack(s,'e1','player');ok(!defensive.hit);ok(!defensive.shock,'Total Defense failed to suppress Shock');
-// Live buttons route to tactical SWN rather than legacy WWN combat.
 let live=E.playerAttack(s);ok(live&&typeof live.mechanics==='string');
 
 for(const id of ['CWN','AWN']){setSystem(id);const x=E.makeInitialState(id);eq(x.campaign.system,id);ok(!E.rulesReady(x));ok(E.auditState(x).ok,E.auditState(x).errors.join(','));const ans=E.queryRules(x,'Faço um teste de ataque');has(ans,'REGRA BLOQUEADA');const before=JSON.stringify(x.continuity.actionLedger||[]),rr=E.performAction(x,'Faço um teste de ataque');ok(rr.ok===false);eq(JSON.stringify(x.continuity.actionLedger||[]),before,'blocked mechanic advanced action ledger');ok((x.narrative||[]).join(' ').length>=495,'opening story missing');}
 
-// Fuzz input hardening and isolation. 20k+ assertions without touching network or Gemini.
 setSystem('WWN');for(let i=0;i<5000;i++){const base=E.makeInitialState('WWN'),raw={name:`P\u0000${i}`,level:i%50,hp:i*100,maxHp:(i%1000)+1,ac:(i%100)-30,attrs:{str:i%40,dex:30-i%40,con:12,int:13,wis:14,cha:9},skills:{notice:(i%20)-5},inventory:Array.from({length:i%130},(_,j)=>`x${j}`),weapon:{name:'Teste',damage:'1d6',skill:'shoot',attr:'dex',kind:'ranged',twoHanded:i%2===0}};const c=E.sanitizeCharacter(raw,'WWN');ok(c.level>=1&&c.level<=20);ok(c.hp>=0&&c.hp<=c.maxHp);ok(c.ac>=0&&c.ac<=40);ok(c.attrs.str>=3&&c.attrs.str<=18);}
 console.log(`XWN4 runtime audit OK: ${checks} checks`);
