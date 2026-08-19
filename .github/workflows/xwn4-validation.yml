@@ -110,6 +110,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          HEAD_SHA="$(git ls-remote origin refs/heads/xwn-4.0.0-barbara | cut -f1)"
+          if [ "$HEAD_SHA" != "$GITHUB_SHA" ]; then
+            echo "Run superseded by $HEAD_SHA; skip green metadata."
+            exit 0
+          fi
           printf '%s\n' "$GITHUB_RUN_ID" > /tmp/run_id.txt
           printf '%s\n' "$GITHUB_SHA" > /tmp/source_commit.txt
           git config user.name github-actions[bot]
@@ -131,6 +136,11 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           set -euo pipefail
+          HEAD_SHA="$(git ls-remote origin refs/heads/xwn-4.0.0-barbara | cut -f1)"
+          if [ "$HEAD_SHA" != "$GITHUB_SHA" ]; then
+            echo "Run superseded by $HEAD_SHA; skip latest metadata."
+            exit 0
+          fi
           rm -rf /tmp/xwn4-meta
           git worktree add --detach /tmp/xwn4-meta "$GITHUB_SHA"
           cd /tmp/xwn4-meta
