@@ -1,0 +1,82 @@
+name: XWN 4 Barbara validation
+
+on:
+  push:
+    branches: [xwn-4.0.0-barbara]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check JavaScript
+        run: |
+          set -e
+          for f in engine.js systems.js adapters.js swn-rules-index.js xwn4-runtime.js xwn4-compat.js xwn4-mechanics-fix.js xwn4-migration.js xwn4-combat-bridge.js barbara-browser.js audioEngineV2.js local-audio-library.js snapshot-store.js gmBridge.js app.js xwn4-ui.js; do node --check "$f"; done
+      - name: Preserved engine regression
+        run: node tests/test_engine.js | tee /tmp/legacy.log
+      - name: XWN 4 rules security tactical Barbara fuzz
+        run: node tests/test_xwn4_runtime.js | tee /tmp/xwn4.log
+      - name: Static parity audit
+        run: python tests/test_xwn4_static.py | tee /tmp/static.log
+      - name: Install Chromium test harness
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --silent playwright@1.55.0
+          npx playwright install --with-deps chromium >/dev/null
+      - name: Real browser smoke
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          sleep 2
+          node tests/browser-smoke.mjs | tee /tmp/browser.log
+          for p in index.html systems.js adapters.js xwn4-runtime.js barbara-browser.js manifest.webmanifest; do curl -fsS "http://127.0.0.1:8765/$p" >/dev/null; done
+      - name: Build validation report
+        run: |
+          {
+            echo 'BRASEIRO XWN 4.0.0 — MOTOR BARBARA'
+            echo "Commit: $GITHUB_SHA"
+            echo
+            cat /tmp/legacy.log
+            cat /tmp/xwn4.log
+            cat /tmp/static.log
+            cat /tmp/browser.log
+            echo
+            echo 'WWN: RULES READY — WWN SRD 1.0'
+            echo 'SWN: RULES READY — Stars Without Number Revised'
+            echo 'CWN: FAIL-CLOSED — corpus RULE principal não empacotado'
+            echo 'AWN: FAIL-CLOSED — corpus RULE principal não empacotado'
+            echo 'Barbara: 1.0.0 @ a31fdb9f9e361fc81b6a5f25c7646450311d0ce3'
+          } > VALIDACAO_XWN_4.0.0.txt
+      - name: Package release candidate
+        run: |
+          rm -rf /tmp/xwnpkg && mkdir -p /tmp/xwnpkg/Braseiro_XWN_4.0.0_MOTOR_BARBARA
+          rsync -a --exclude '.git' --exclude 'node_modules' --exclude 'package.json' --exclude 'package-lock.json' --exclude 'releases' ./ /tmp/xwnpkg/Braseiro_XWN_4.0.0_MOTOR_BARBARA/
+          cp VALIDACAO_XWN_4.0.0.txt /tmp/xwnpkg/Braseiro_XWN_4.0.0_MOTOR_BARBARA/
+          cd /tmp/xwnpkg
+          zip -qr "$GITHUB_WORKSPACE/Braseiro_XWN_4.0.0_MOTOR_BARBARA.zip" Braseiro_XWN_4.0.0_MOTOR_BARBARA
+          cd "$GITHUB_WORKSPACE"
+          sha256sum Braseiro_XWN_4.0.0_MOTOR_BARBARA.zip > Braseiro_XWN_4.0.0_MOTOR_BARBARA.sha256
+          unzip -t Braseiro_XWN_4.0.0_MOTOR_BARBARA.zip >/tmp/ziptest.log
+      - name: Publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Braseiro-XWN-4.0.0-Motor-Barbara
+          path: |
+            Braseiro_XWN_4.0.0_MOTOR_BARBARA.zip
+            Braseiro_XWN_4.0.0_MOTOR_BARBARA.sha256
+            VALIDACAO_XWN_4.0.0.txt
+          if-no-files-found: error
+          retention-days: 30
