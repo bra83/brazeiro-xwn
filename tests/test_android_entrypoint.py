@@ -30,3 +30,11 @@ def test_android_entrypoint_same_config_is_idempotent(tmp_path):
 def test_android_entrypoint_validates_configuration():
     with pytest.raises(ValueError): android.configure(use_gemini='yes')
     with pytest.raises(ValueError): android.configure(use_gemini=False,rag_db_path='')
+
+
+def test_android_configure_json_is_positional_and_valid_json(tmp_path):
+    db=str(tmp_path/'rag.sqlite3')
+    raw=android.configure_json(None,'gemini-3.5-flash-lite',db,False)
+    assert json.loads(raw)=={'configured':True,'model':None,'rag_persistent':True}
+    state=android.new_campaign('c','gurps')
+    assert json.loads(state)['system_id']=='gurps'
