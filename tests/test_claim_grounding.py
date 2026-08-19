@@ -47,3 +47,25 @@ def test_empty_claim_fails_closed():
     s=CampaignState('c','gurps')
     with pytest.raises(ValueError,match='empty_claim'): BarbaraEngine(P(['   '])).turn(s,'look','r')
     assert s.tick==0
+
+def test_untyped_claim_is_rejected_even_when_words_match():
+    s=CampaignState('c','gurps',facts={'victim':'Ada is dead today'})
+    with pytest.raises(ValueError,match='claim_type_required'): BarbaraEngine(P(['Ada is dead today'])).turn(s,'look','r')
+    assert s.tick==0
+
+def test_lexical_overlap_cannot_reverse_alive_dead_fact():
+    s=CampaignState('c','gurps',facts={'king':'the king is dead today in court'})
+    with pytest.raises(ValueError,match='fato_claim_sem_evidencia'): BarbaraEngine(P(['FACT: the king is alive today in court'])).turn(s,'look','r')
+    assert s.tick==0
+
+def test_numeric_rule_mismatch_is_not_grounded_by_shared_words():
+    e=BarbaraEngine(P(['RULE: attack causes 12 damage on a critical hit'])); s=CampaignState('c','gurps')
+    e.rag.replace_source('rules',[Evidence('rules','attack causes 10 damage on a critical hit','RULE','c','gurps')])
+    with pytest.raises(ValueError,match='regra_claim_sem_evidencia'): e.turn(s,'attack causes damage critical hit','r',mechanical=True)
+    assert s.tick==0
+
+def test_matching_numeric_rule_still_passes():
+    e=BarbaraEngine(P(['RULE: attack causes 10 damage on a critical hit'])); s=CampaignState('c','gurps')
+    e.rag.replace_source('rules',[Evidence('rules','attack causes 10 damage on a critical hit','RULE','c','gurps')])
+    r=e.turn(s,'attack causes 10 damage critical hit','r',mechanical=True)
+    assert r['claims']==['RULE: attack causes 10 damage on a critical hit']
