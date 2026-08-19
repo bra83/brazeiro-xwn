@@ -4,18 +4,18 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#8fc7e8" id="themeColorMeta" />
-  <title>Braseiro XWN — WWN 3.0</title>
+  <title>Braseiro XWN 4.0 — Motor Barbara</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-period="morning">
   <header class="topbar">
     <div class="brand-block">
-      <div class="eyebrow">BRASEIRO XWN • WWN 3.0</div>
-      <h1 id="campaignName">As Marchas de Orne</h1>
+      <div class="eyebrow">BRASEIRO XWN 4.0 • MOTOR BARBARA</div>
+      <h1 id="campaignName">Without Numbers</h1>
     </div>
     <div class="world-meta">
-      <span id="dayLabel">Dia 1</span><span id="timeLabel">08:00</span><span id="weatherLabel">Bruma fria</span><span id="seasonLabel">Outono</span>
+      <span id="dayLabel">Dia 1</span><span id="timeLabel">08:00</span><span id="weatherLabel">—</span><span id="seasonLabel">—</span>
     </div>
   </header>
 
@@ -29,19 +29,19 @@
       <div class="live-grid">
         <article class="live-card map-card">
           <div class="card-head compact-head">
-            <div><span class="eyebrow">ATLAS • 6 MILHAS</span><h2 id="hexTitle">Dorsa</h2></div>
+            <div><span class="eyebrow">ATLAS • DOMÍNIO DO SISTEMA</span><h2 id="hexTitle">Local atual</h2></div>
             <div class="map-tools"><button id="zoomOut" class="icon-btn">−</button><button id="zoomReset" class="icon-btn">◎</button><button id="zoomIn" class="icon-btn">+</button></div>
           </div>
           <div class="map-viewport" id="mapViewport"><div class="hex-map" id="hexMap"></div></div>
           <div class="map-live-footer">
-            <div><b id="selectedLabel">Dorsa</b><small id="terrainLabel">Campos cultivados</small></div>
+            <div><b id="selectedLabel">Local atual</b><small id="terrainLabel">Domínio</small></div>
             <div class="map-actions"><button class="secondary" id="exploreBtn">Explorar</button><button class="primary" id="travelBtn">Viajar</button></div>
           </div>
         </article>
 
         <article class="live-card scene-card">
           <div class="card-head compact-head">
-            <div><span class="eyebrow">MESTRE</span><h2 id="sceneTitle">A estrada para fora de Dorsa</h2></div>
+            <div><span class="eyebrow">MESTRE</span><h2 id="sceneTitle">Abertura da campanha</h2></div>
             <div class="story-tools"><button class="ghost compact" id="ttsBtn">▶</button><button class="ghost compact" id="ttsStopBtn">■</button></div>
           </div>
 
@@ -77,7 +77,7 @@
 
     <section class="page" id="page-character" data-page="character">
       <article class="panel">
-        <div class="card-head"><div><span class="eyebrow">PERSONAGEM</span><h2 id="charName">Elian Vargo</h2></div><span class="level-pill" id="charClass">Expert 1</span></div>
+        <div class="card-head"><div><span class="eyebrow">PERSONAGEM</span><h2 id="charName">Personagem</h2></div><span class="level-pill" id="charClass">Nível 1</span></div>
         <div class="character-hero"><div id="characterBigToken" class="character-big-token"></div><div class="stat-grid"><div><span>PV</span><strong id="hpText"></strong></div><div><span>CA</span><strong id="acText"></strong></div><div><span>AB</span><strong id="abText"></strong></div><div><span>Strain</span><strong id="strainText"></strong></div><div><span>Condição</span><strong id="conditionText"></strong></div></div></div>
         <div class="hpbar player"><i id="playerHpBar"></i></div>
         <h3>Atributos</h3><div class="attr-grid" id="attrGrid"></div>
@@ -95,10 +95,10 @@
 
     <section class="page" id="page-rules" data-page="rules">
       <article class="rules-panel full-rules-panel">
-        <div class="blue-head"><div><span class="eyebrow">REGRAS INDEXADAS • ESTADO PROTEGIDO</span><h2>Manual / dúvidas</h2></div><span class="lock-pill">NÃO AVANÇA</span></div>
+        <div class="blue-head"><div><span class="eyebrow">REGRAS INDEXADAS • RULE GATE</span><h2>Manual / dúvidas</h2></div><span class="lock-pill">NÃO AVANÇA</span></div>
         <div class="rule-index-status" id="ruleIndexStatus"></div>
         <div class="rules-answer" id="rulesAnswer">Pergunte uma regra, ação possível ou dúvida espacial já estabelecida.</div>
-        <div class="composer blue-composer"><textarea id="rulesInput" rows="3" placeholder="Ex.: como funciona estabilizar um personagem? Posso fazer isso sem teste?"></textarea><button class="mic-btn blue-mic" id="rulesMic">🎙</button><button class="blue-btn send-btn" id="sendRule">Consultar</button></div>
+        <div class="composer blue-composer"><textarea id="rulesInput" rows="3" placeholder="Ex.: como funciona iniciativa? Posso fazer isso sem teste?"></textarea><button class="mic-btn blue-mic" id="rulesMic">🎙</button><button class="blue-btn send-btn" id="sendRule">Consultar</button></div>
         <div class="speech-status" id="rulesSpeechStatus"></div>
       </article>
     </section>
@@ -112,7 +112,7 @@
 
     <section class="page" id="page-audio" data-page="audio">
       <article class="panel"><div class="card-head"><div><span class="eyebrow">ÁUDIO • PERFIL FORBIDDEN LANDS</span><h2>Voz e ambiência</h2></div><span id="audioStatus" class="level-pill">Pronto</span></div>
-        <div class="audio-grid"><label>Motor de voz<select id="voiceProvider"><option value="gemini">Gemini TTS — Charon (Forbidden Lands)</option><option value="browser">Voz do navegador/Android</option></select></label><label>Velocidade <input id="ttsRate" type="range" min="0.85" max="1.45" step="0.01" value="1.08"><output id="ttsRateValue"></output></label><label>Voz <input id="ttsVolume" type="range" min="0" max="1" step="0.05" value="1"><output id="ttsVolumeValue"></output></label><label class="toggle-row"><input id="ambientToggle" type="checkbox"> Ambiência procedural</label><label>Ambiente <input id="ambientVolume" type="range" min="0" max="0.4" step="0.01" value="0.12"><output id="ambientVolumeValue"></output></label></div><p class="muted-note">Charon usa a mesma chave Gemini da aba Config e herda o fluxo rápido do Forbidden Lands: primeiro trecho curto, próximo trecho sintetizado durante a fala, cache local e ducking da ambiência.</p>
+        <div class="audio-grid"><label>Motor de voz<select id="voiceProvider"><option value="gemini">Gemini TTS — Charon</option><option value="browser">Voz do navegador/Android</option></select></label><label>Velocidade <input id="ttsRate" type="range" min="0.85" max="1.45" step="0.01" value="1.08"><output id="ttsRateValue"></output></label><label>Voz <input id="ttsVolume" type="range" min="0" max="1" step="0.05" value="1"><output id="ttsVolumeValue"></output></label><label class="toggle-row"><input id="ambientToggle" type="checkbox"> Ambiência procedural</label><label>Ambiente <input id="ambientVolume" type="range" min="0" max="0.4" step="0.01" value="0.12"><output id="ambientVolumeValue"></output></label></div><p class="muted-note">Charon usa a mesma chave Gemini da aba Config: primeiro trecho curto, pré-síntese do próximo, cache local e ducking da ambiência.</p>
         <p class="muted-note">Sessões de voz cancelam a anterior, a fala é segmentada para reduzir latência e a ambiência sofre ducking durante a narração.</p>
       </article>
     </section>
@@ -122,12 +122,12 @@
         <span class="eyebrow">CONFIGURAÇÃO</span><h2>Campanha e integração</h2>
         <div class="settings-grid">
           <label>Gemini API (opcional, só neste navegador)<input id="geminiApiKey" type="password" placeholder="Chave para Mestre IA opcional"></label>
-          <label class="toggle-row"><input id="gmAiToggle" type="checkbox"> Refinar narração com Gemini sem permitir que a IA altere regras/estado</label>
+          <label class="toggle-row"><input id="gmAiToggle" type="checkbox"> Refinar narração com Gemini sob validação do Motor Barbara</label>
           <div><b>Tema dinâmico</b><p class="muted-note">Manhã azul claro · tarde azul profundo · noite cinza escuro · madrugada preto. O contraste é recalculado automaticamente.</p></div>
         </div>
-        <div class="save-tools"><button class="secondary" id="exportBtn">Exportar campanha JSON</button><label class="secondary file-label">Importar campanha<input type="file" id="importInput" accept="application/json,.json" hidden></label><button class="ghost" id="resetBtn">Reiniciar campanha</button></div>
+        <div class="save-tools"><button class="secondary" id="exportBtn">Exportar aventura/campanha JSON</button><label class="secondary file-label">Importar aventura/campanha<input type="file" id="importInput" accept="application/json,.json" hidden></label><button class="ghost" id="resetBtn">Reiniciar campanha</button></div>
       </article>
-      <article class="panel"><span class="eyebrow">BIBLIOTECA</span><h2>Hexes full-bleed</h2><div class="hex-library-grid" id="hexLibraryGrid"></div></article>
+      <article class="panel"><span class="eyebrow">BIBLIOTECA</span><h2>Hexes / tiles</h2><div class="hex-library-grid" id="hexLibraryGrid"></div></article>
     </section>
   </main>
 
@@ -147,6 +147,21 @@
 
   <dialog id="geminiDialog" class="token-dialog"><form method="dialog" class="dialog-card wide-dialog"><div class="card-head"><div><span class="eyebrow">IMAGEM DA CENA</span><h2>Gemini + continuidade visual</h2></div><button class="ghost" value="cancel">✕</button></div><p class="muted-note">O prompt inclui apenas o que os personagens podem perceber e preserva a identidade dos tokens presentes.</p><textarea id="geminiPromptText" rows="8" readonly></textarea><div id="geminiReferenceList" class="gemini-refs"></div><div class="dialog-actions"><button type="button" class="primary" id="shareGeminiPrompt">Abrir / enviar ao Gemini</button><button type="button" class="secondary" id="copyGeminiPrompt">Copiar prompt</button><label class="secondary file-label">Receber imagem manualmente<input type="file" id="sceneImageInput" accept="image/*" hidden></label></div></form></dialog>
 
-  <script src="hex-library.js"></script><script src="rules-index.js"></script><script src="engine.js"></script><script src="audioEngineV2.js"></script><script src="gmBridge.js"></script><script src="app.js"></script>
+  <script src="systems.js"></script>
+  <script src="adapters.js"></script>
+  <script src="hex-library.js"></script>
+  <script src="rules-index.js"></script>
+  <script src="swn-rules-index.js"></script>
+  <script src="engine.js"></script>
+  <script src="xwn4-runtime.js"></script>
+  <script src="xwn4-compat.js"></script>
+  <script src="xwn4-combat-bridge.js"></script>
+  <script src="barbara-browser.js"></script>
+  <script src="audioEngineV2.js"></script>
+  <script src="local-audio-library.js"></script>
+  <script src="snapshot-store.js"></script>
+  <script src="gmBridge.js"></script>
+  <script src="app.js"></script>
+  <script src="xwn4-ui.js"></script>
 </body>
 </html>
