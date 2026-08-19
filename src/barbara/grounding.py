@@ -38,11 +38,15 @@ class ClaimGrounding:
             overlap=len(ct & st)/len(ct)
             if overlap>=0.6 or ct<=st: return True
         return False
-    def validate(self,claims,state,evidence,visible_rumors):
+    def validate(self,claims,state,evidence,visible_rumors,public_context=None):
         if not isinstance(claims,list) or not all(isinstance(c,str) for c in claims): raise ValueError('invalid_claims')
         facts=self._flatten(getattr(state,'facts',{}))
         rules=[e.text for e in evidence if getattr(e,'kind',None)=='RULE' and not getattr(e,'secret',False)]
         canon=facts+[e.text for e in evidence if getattr(e,'kind',None) in {'LORE','MEMORY'} and not getattr(e,'secret',False)]
+        if public_context is not None:
+            if not isinstance(public_context,dict): raise ValueError('invalid_public_context')
+            for key in ('site','public_ledger','npcs'):
+                if key in public_context: canon.extend(self._flatten(public_context[key]))
         rumors=self._flatten(visible_rumors)
         out=[]
         for raw in claims:
@@ -52,8 +56,7 @@ class ClaimGrounding:
             if not any(upper.startswith(prefix) for prefix in self.PREFIXES): raise ValueError('claim_type_required')
             body=claim.split(':',1)[1].strip()
             if not body: raise ValueError('empty_claim_body')
-            if upper.startswith('INFERENCE:'):
-                out.append(claim); continue
+            if upper.startswith('INFERENCE:'): out.append(claim); continue
             if upper.startswith('RUMOR:'):
                 if not self._supported(body,rumors): raise ValueError('rumor_sem_evidencia')
                 out.append(claim); continue
