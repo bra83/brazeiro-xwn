@@ -31,6 +31,7 @@ jobs:
           cd ..
           sha256sum Braseiro_XWN_PRESERVED_BACKUP.zip > Braseiro_XWN_PRESERVED_BACKUP.sha256
           base64 -w 76 Braseiro_XWN_PRESERVED_BACKUP.zip > Braseiro_XWN_PRESERVED_BACKUP.zip.b64
+          printf '%s\n' '${{ github.run_id }}' > run_id.txt
       - name: Mirror encoded archive to export branch
         env:
           GH_TOKEN: ${{ github.token }}
@@ -42,6 +43,7 @@ jobs:
           mkdir -p exported
           cp ../Braseiro_XWN_PRESERVED_BACKUP.zip.b64 exported/
           cp ../Braseiro_XWN_PRESERVED_BACKUP.sha256 exported/
+          cp ../run_id.txt exported/
           git add exported
           git commit -m 'export: preserved XWN source archive [skip ci]' || true
           git push --force origin xwn-export
