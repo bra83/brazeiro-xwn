@@ -25,7 +25,7 @@ class BarbaraEngine:
         if not isinstance(request_id,str) or not request_id or len(request_id)>160:raise ValueError('invalid_request_id')
     def _binding_key(self,state,request_id):return (state.campaign_id,request_id)
     def _check_binding(self,state,request_id,fingerprint):
-        key=self._binding_key(state,request_id); entry=self._request_bindings.get(key)
+        entry=self._request_bindings.get(self._binding_key(state,request_id))
         if entry is None:return None
         if entry['fingerprint']!=fingerprint:raise ValueError('request_id_collision')
         return deepcopy(entry['result'])
@@ -45,10 +45,11 @@ class BarbaraEngine:
         return tuple(float(x) for x in vector)
     def _error_code(self,exc):
         msg=str(exc).split(':',1)[0]; return msg if re.fullmatch(r'[A-Za-z0-9_\-]{1,80}',msg or '') else exc.__class__.__name__
-    def _system_profile(self,state):
+    def _adapter(self,state):
         try:adapter=self.adapters.get(state.system_id)
         except KeyError as exc:raise ValueError(f'unsupported_system:{state.system_id}') from exc
-        adapter.validate_campaign(state); return {'system_id':adapter.system_id,'family':adapter.family,'lore_scope':adapter.lore_scope,'rules_ready':adapter.rules_ready(self.rag,state.campaign_id)}
+        adapter.validate_campaign(state); return adapter
+    def _system_profile(self,state):return self._adapter(state).narrator_profile(self.rag,state.campaign_id)
     def _public_world_context(self,state):
         site=deepcopy(state.sites.get(state.location,{})) if state.location else {}; ledger=[deepcopy(e) for e in state.public_ledger[-20:] if isinstance(e,dict) and (e.get('origin') in {None,state.location} or state.location=='')]; return {'site':public_view(site),'ledger':public_view(ledger)}
     def narrator_context(self,state,evidence,text='',importance='normal',turn_plan=None,resolution=None):
@@ -93,7 +94,7 @@ class BarbaraEngine:
                 others=[rid for rid in state.request_log if rid!=request_id]
                 if others:state.request_log.pop(min(others,key=lambda rid:(int(state.request_log[rid].get('result',{}).get('tick',0)),rid)),None)
     def turn(self,state,text,request_id,mechanical=False,importance='normal',resolution=None):
-        self._validate_request_id(request_id); state.validate(); base_plan=self.narrative.turn_plan(text,mechanical,importance); inferred=self.mechanics.requires_rule(text,mechanical,base_plan); effective_mechanical=bool(mechanical or (inferred and base_plan['mode']=='fiction')); plan=self.narrative.turn_plan(text,effective_mechanical,importance); trusted_resolution=self.mechanics.validate_resolution(resolution); profile=self._system_profile(state); fingerprint=self._fingerprint(state,text,effective_mechanical,importance,trusted_resolution)
+        self._validate_request_id(request_id); state.validate(); adapter=self._adapter(state); base_plan=self.narrative.turn_plan(text,mechanical,importance); inferred=self.mechanics.requires_rule(text,mechanical,base_plan); effective_mechanical=bool(mechanical or (inferred and base_plan['mode']=='fiction')); plan=self.narrative.turn_plan(text,effective_mechanical,importance); trusted_resolution=adapter.validate_resolution(self.mechanics.validate_resolution(resolution)); profile=adapter.narrator_profile(self.rag,state.campaign_id); fingerprint=self._fingerprint(state,text,effective_mechanical,importance,trusted_resolution)
         bound=self._check_binding(state,request_id,fingerprint)
         if bound is not None:self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id); return bound
         if request_id in state.request_log:
