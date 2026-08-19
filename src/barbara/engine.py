@@ -18,10 +18,18 @@ class BarbaraEngine:
     _RETRIEVAL_HINTS={'combat':'combat attack ataque ataco golpe strike fight damage dano defense defesa','travel':'travel journey viagem viajo road estrada trail trilha movement movimento','investigation':'investigation investigate investigação exam examine examino search procura clue pista perception percepção','dialogue':'dialogue social conversa persuasion persuasão reaction reação influence influência','action':'action ação check teste skill perícia ability habilidade'}
     def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None,rag=None,rag_db_path=None,embedder=None,telemetry=None,adapters=None):
         if rag is not None and rag_db_path is not None:raise ValueError('rag_configuration_conflict')
-        self.provider=provider; self.rag=rag if rag is not None else RAG(rag_db_path); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self.adapters=adapters or AdapterRegistry()
+        self.provider=provider; self.rag=rag if rag is not None else RAG(rag_db_path); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self.adapters=adapters or AdapterRegistry(); self._request_bindings={}
     def _fingerprint(self,state,text,mechanical,importance):return [state.campaign_id,state.system_id,text,mechanical,importance]
     def _validate_request_id(self,request_id):
         if not isinstance(request_id,str) or not request_id or len(request_id)>160:raise ValueError('invalid_request_id')
+    def _binding_key(self,state,request_id):return (state.campaign_id,request_id)
+    def _check_binding(self,state,request_id,fingerprint):
+        key=self._binding_key(state,request_id); entry=self._request_bindings.get(key)
+        if entry is None:return None
+        if entry['fingerprint']!=fingerprint:raise ValueError('request_id_collision')
+        return deepcopy(entry['result'])
+    def _bind_request(self,state,request_id,fingerprint,result):
+        self._request_bindings[self._binding_key(state,request_id)]={'fingerprint':deepcopy(fingerprint),'result':deepcopy(result)}
     def _retrieval_query(self,text,plan,mechanical=False):
         q=str(text)
         if mechanical and plan.get('mode')=='fiction':
@@ -86,10 +94,13 @@ class BarbaraEngine:
                 if others:state.request_log.pop(min(others,key=lambda rid:(int(state.request_log[rid].get('result',{}).get('tick',0)),rid)),None)
     def turn(self,state,text,request_id,mechanical=False,importance='normal'):
         self._validate_request_id(request_id); state.validate(); plan=self.narrative.turn_plan(text,mechanical,importance); profile=self._system_profile(state); fingerprint=self._fingerprint(state,text,mechanical,importance)
+        bound=self._check_binding(state,request_id,fingerprint)
+        if bound is not None:
+            self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id); return bound
         if request_id in state.request_log:
             entry=state.request_log[request_id]
             if entry['fingerprint']!=fingerprint:raise ValueError('request_id_collision')
-            self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id); return deepcopy(entry['result'])
+            self._bind_request(state,request_id,fingerprint,entry['result']); self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id); return deepcopy(entry['result'])
         before=state.snapshot()
         try:
             retrieval_query=self._retrieval_query(text,plan,mechanical); query_vector=self._query_vector(retrieval_query); evidence=self.rag.retrieve(retrieval_query,state.campaign_id,state.system_id,kinds={'RULE','LORE','MEMORY'},allow_secret=False,query_vector=query_vector); self.rules.require(mechanical,evidence)
@@ -97,7 +108,7 @@ class BarbaraEngine:
             context=self.narrator_context(state,evidence,text,importance,plan); result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':plan['mode'],'world_advanced':plan['world_advances'],'importance':importance,'system_profile':profile,'turn_plan':deepcopy(plan),'presentation':deepcopy(plan['channels'])}
             if self.provider:
                 raw=self.recovery.run(lambda:self.provider.generate(text,context,state)); validated=self._validate_provider_output(raw,state,evidence,context,text,importance); self._apply_patches(state,validated['state_patch']); result.update(validated)
-            self._remember_request(state,request_id,fingerprint,result); state.validate()
+            self._remember_request(state,request_id,fingerprint,result); state.validate(); self._bind_request(state,request_id,fingerprint,result)
         except Exception as exc:
             state.__dict__.clear(); state.__dict__.update(before.__dict__); self.telemetry.record('reject',self._error_code(exc),campaign=state.campaign_id,system=state.system_id); raise
         self.telemetry.record('turn','ok',campaign=state.campaign_id,system=state.system_id,mode=result['mode']); return deepcopy(result)
