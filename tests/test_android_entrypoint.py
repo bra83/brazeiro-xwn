@@ -1,0 +1,32 @@
+import json
+import pytest
+from barbara import android
+
+
+def setup_function(): android.reset_for_tests()
+
+
+def test_android_entrypoint_requires_configuration():
+    with pytest.raises(RuntimeError,match='barbara_android_not_configured'):
+        android.new_campaign('c','gurps')
+
+
+def test_android_entrypoint_roundtrip_without_network_provider(tmp_path):
+    status=android.configure(use_gemini=False,rag_db_path=str(tmp_path/'rag.sqlite3'))
+    assert status=={'configured':True,'model':None,'rag_persistent':True}
+    state=android.new_campaign('c','gurps')
+    out=json.loads(android.turn(state,json.dumps({'text':'Olho ao redor','request_id':'r1'})))
+    assert out['result']['tick']==1
+    assert json.loads(out['state'])['tick']==1
+
+
+def test_android_entrypoint_same_config_is_idempotent(tmp_path):
+    db=str(tmp_path/'rag.sqlite3')
+    a=android.configure(use_gemini=False,rag_db_path=db)
+    b=android.configure(use_gemini=False,rag_db_path=db)
+    assert a==b
+
+
+def test_android_entrypoint_validates_configuration():
+    with pytest.raises(ValueError): android.configure(use_gemini='yes')
+    with pytest.raises(ValueError): android.configure(use_gemini=False,rag_db_path='')
