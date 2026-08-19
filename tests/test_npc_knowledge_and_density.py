@@ -3,6 +3,7 @@ from barbara.engine import BarbaraEngine
 from barbara.state import CampaignState
 
 class P:
+    legacy_text=True
     def __init__(self,text): self.text=text; self.context=None
     def generate(self,text,context,state): self.context=context; return self.text
 
