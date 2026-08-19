@@ -4,12 +4,7 @@ from .intent import ActionClassifier
 
 
 class ActionPipeline:
-    """Pre-RAG command router for host input.
-
-    UI-only commands and character thoughts are guaranteed no-op operations over
-    canonical campaign state. Rules/meta/dialogue/game actions are routed to the
-    existing BarbaraEngine only after classification.
-    """
+    """Pre-RAG command router for host input."""
 
     def __init__(self, engine, classifier=None):
         self.engine = engine
@@ -27,6 +22,7 @@ class ActionPipeline:
             'presentation': deepcopy(classification['presentation']),
             'resolution': None,
             'event_ids': [],
+            'phase': 'COMPLETED',
         }
 
     def execute(self, state, text, request_id, mechanical=False, importance='normal', resolution=None, expected_state_version=None):
@@ -48,4 +44,19 @@ class ActionPipeline:
         )
         result['input_type'] = input_type
         result['input_classification'] = deepcopy(classification)
+        return result
+
+    def resume(self, state, action_id, request_id, resolution, expected_state_version=None):
+        if not isinstance(action_id, str) or not action_id:
+            raise ValueError('invalid_action_id')
+        if resolution is None:
+            raise ValueError('missing_resume_resolution')
+        result = self.engine.resume_action(
+            state,
+            action_id,
+            request_id,
+            deepcopy(resolution),
+            expected_state_version=expected_state_version,
+        )
+        result['input_type'] = 'mechanical_resume'
         return result
