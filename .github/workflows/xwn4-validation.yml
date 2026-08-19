@@ -26,12 +26,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for f in engine.js systems.js adapters.js swn-rules-index.js xwn4-runtime.js xwn4-compat.js xwn4-mechanics-fix.js xwn4-migration.js xwn4-combat-bridge.js barbara-browser.js audioEngineV2.js local-audio-library.js snapshot-store.js gmBridge.js app.js xwn4-ui.js; do node --check "$f"; done
+          for f in engine.js systems.js adapters.js swn-rules-index.js xwn4-runtime.js xwn4-rules-fix.js xwn4-compat.js xwn4-mechanics-fix.js xwn4-migration.js xwn4-combat-bridge.js barbara-browser.js audioEngineV2.js local-audio-library.js snapshot-store.js gmBridge.js app.js xwn4-ui.js; do node --check "$f"; done
       - name: Preserved engine regression
         shell: bash
         run: |
           set -euo pipefail
           node tests/test_engine.js | tee /tmp/legacy.log
+      - name: XWN 3.7 quick-rule regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/test_xwn4_rule_boundaries.js | tee /tmp/rulefix.log
       - name: XWN 4 rules security tactical Barbara fuzz
         shell: bash
         run: |
@@ -57,7 +62,7 @@ jobs:
           trap 'kill $SERVER_PID || true' EXIT
           sleep 2
           node tests/browser-smoke.mjs | tee /tmp/browser.log
-          for p in index.html systems.js adapters.js xwn4-runtime.js barbara-browser.js manifest.webmanifest; do curl -fsS "http://127.0.0.1:8765/$p" >/dev/null; done
+          for p in index.html systems.js adapters.js xwn4-runtime.js xwn4-rules-fix.js barbara-browser.js manifest.webmanifest; do curl -fsS "http://127.0.0.1:8765/$p" >/dev/null; done
       - name: Build validation report
         run: |
           set -euo pipefail
@@ -67,6 +72,7 @@ jobs:
             echo "Actions run: $GITHUB_RUN_ID"
             echo
             cat /tmp/legacy.log
+            cat /tmp/rulefix.log
             cat /tmp/xwn4.log
             cat /tmp/static.log
             cat /tmp/browser.log
