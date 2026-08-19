@@ -1,5 +1,5 @@
 from copy import deepcopy
-import re
+import hashlib,json,re
 from .rag import RAG
 from .rules import RuleGate
 from .world import WorldTick
@@ -52,9 +52,24 @@ class BarbaraEngine:
     def _system_profile(self,state):return self._adapter(state).narrator_profile(self.rag,state.campaign_id)
     def _public_world_context(self,state):
         site=deepcopy(state.sites.get(state.location,{})) if state.location else {}; ledger=[deepcopy(e) for e in state.public_ledger[-20:] if isinstance(e,dict) and (e.get('origin') in {None,state.location} or state.location=='')]; return {'site':public_view(site),'ledger':public_view(ledger)}
+    def _world_imprint(self,state):
+        world=self._public_world_context(state); data={'location':state.location,'site':world['site'],'ledger':world['ledger'],'weather':public_view(state.weather),'economy':public_view(state.economy)}
+        raw=json.dumps(data,ensure_ascii=False,sort_keys=True,separators=(',',':'),default=str).encode(); return hashlib.sha256(raw).hexdigest()
+    def _story_occasion(self,state,plan):
+        if plan.get('mode')!='fiction' or not state.location:return 'continuation'
+        discovery=state.discovery; locations=discovery.get('locations',{})
+        if not discovery.get('campaign_started',False):return 'campaign_opening'
+        previous=locations.get(state.location)
+        if not isinstance(previous,dict):return 'first_arrival'
+        if previous.get('imprint')!=self._world_imprint(state):return 'changed_return'
+        return 'continuation'
+    def _mark_discovery(self,state,plan):
+        if plan.get('mode')!='fiction' or not state.location:return
+        state.discovery['campaign_started']=True; locations=state.discovery.setdefault('locations',{})
+        locations[state.location]={'last_seen_tick':state.tick,'imprint':self._world_imprint(state)}
     def narrator_context(self,state,evidence,text='',importance='normal',turn_plan=None,resolution=None):
-        safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]; qcount=self.narrative.question_count(text); world=self._public_world_context(state); memories=self.memory.compact_context(state,query=text,location=state.location)
-        return public_view({'location':state.location,'facts':state.facts,'memory':memories,'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'site':world['site'],'public_ledger':world['ledger'],'evidence':safe,'resolution':deepcopy(resolution),'system_profile':self._system_profile(state),'narrative_policy':self.narrative.narrator_directives(importance,qcount,turn_plan)})
+        safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]; qcount=self.narrative.question_count(text); world=self._public_world_context(state); memories=self.memory.compact_context(state,query=text,location=state.location); occasion=(turn_plan or {}).get('story_obligation','continuation')
+        return public_view({'location':state.location,'facts':state.facts,'memory':memories,'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'site':world['site'],'public_ledger':world['ledger'],'world_state_for_dramatization':{'weather':state.weather,'economy':state.economy},'world_experience':{'occasion':occasion,'player_has_preexisting_local_knowledge':occasion not in {'campaign_opening','first_arrival'},'instruction':'Transform current world state into perceivable fiction. Do not report hidden/global state as a briefing.'},'evidence':safe,'resolution':deepcopy(resolution),'system_profile':self._system_profile(state),'narrative_policy':self.narrative.narrator_directives(importance,qcount,turn_plan)})
     def _validate_provider_output(self,out,state,evidence,context,user_text,importance='normal',plan=None,resolution=None):
         legacy_string=isinstance(out,str); legacy_opt_out=bool(legacy_string and getattr(self.provider,'legacy_text',False))
         if legacy_string:out={'narration':out,'claims':[],'state_patch':[]}
@@ -64,7 +79,9 @@ class BarbaraEngine:
         if not isinstance(narration,str) or not narration.strip() or len(narration)>self.MAX_NARRATION:raise ValueError('invalid_narration')
         if len(narration)<self.narrative.minimum_acceptable_chars(importance):raise ValueError('narrativa_resumida_demais')
         self.narrative.validate_player_agency(user_text,narration); self.mechanics.validate_narration(narration,bool(plan and plan.get('check_required')),resolution)
-        if not legacy_opt_out:self.narrative.validate_response_coverage(user_text,narration); self.narrative.validate_scene_ending(narration,importance)
+        if not legacy_opt_out:
+            self.narrative.validate_response_coverage(user_text,narration); self.narrative.validate_scene_ending(narration,importance)
+            if getattr(self.provider,'enforce_story_contract',False):self.narrative.validate_story_obligation(narration,(plan or {}).get('story_obligation','continuation'))
         claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state),public_context=context)
         if not isinstance(patches,list):raise ValueError('invalid_state_patch')
         for p in patches:
@@ -94,7 +111,7 @@ class BarbaraEngine:
                 others=[rid for rid in state.request_log if rid!=request_id]
                 if others:state.request_log.pop(min(others,key=lambda rid:(int(state.request_log[rid].get('result',{}).get('tick',0)),rid)),None)
     def turn(self,state,text,request_id,mechanical=False,importance='normal',resolution=None):
-        self._validate_request_id(request_id); state.validate(); adapter=self._adapter(state); base_plan=self.narrative.turn_plan(text,mechanical,importance); inferred=self.mechanics.requires_rule(text,mechanical,base_plan); effective_mechanical=bool(mechanical or (inferred and base_plan['mode']=='fiction')); plan=self.narrative.turn_plan(text,effective_mechanical,importance); trusted_resolution=adapter.validate_resolution(self.mechanics.validate_resolution(resolution)); profile=adapter.narrator_profile(self.rag,state.campaign_id); fingerprint=self._fingerprint(state,text,effective_mechanical,importance,trusted_resolution)
+        self._validate_request_id(request_id); state.validate(); adapter=self._adapter(state); base_plan=self.narrative.turn_plan(text,mechanical,importance); inferred=self.mechanics.requires_rule(text,mechanical,base_plan); effective_mechanical=bool(mechanical or (inferred and base_plan['mode']=='fiction')); plan=self.narrative.turn_plan(text,effective_mechanical,importance); plan=self.narrative.apply_story_obligation(plan,self._story_occasion(state,plan)); trusted_resolution=adapter.validate_resolution(self.mechanics.validate_resolution(resolution)); profile=adapter.narrator_profile(self.rag,state.campaign_id); fingerprint=self._fingerprint(state,text,effective_mechanical,importance,trusted_resolution)
         bound=self._check_binding(state,request_id,fingerprint)
         if bound is not None:self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id); return bound
         if request_id in state.request_log:
@@ -108,7 +125,7 @@ class BarbaraEngine:
             context=self.narrator_context(state,evidence,text,importance,plan,trusted_resolution); result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':plan['mode'],'world_advanced':plan['world_advances'],'importance':importance,'system_profile':profile,'turn_plan':deepcopy(plan),'presentation':deepcopy(plan['channels']),'resolution':deepcopy(trusted_resolution)}
             if self.provider:
                 raw=self.recovery.run(lambda:self.provider.generate(text,context,state)); validated=self._validate_provider_output(raw,state,evidence,context,text,importance,plan,trusted_resolution); self._apply_patches(state,validated['state_patch']); result.update(validated)
-            self._remember_request(state,request_id,fingerprint,result); state.validate(); self._bind_request(state,request_id,fingerprint,result)
+            self._mark_discovery(state,plan); self._remember_request(state,request_id,fingerprint,result); state.validate(); self._bind_request(state,request_id,fingerprint,result)
         except Exception as exc:
             state.__dict__.clear(); state.__dict__.update(before.__dict__); self.telemetry.record('reject',self._error_code(exc),campaign=state.campaign_id,system=state.system_id); raise
         self.telemetry.record('turn','ok',campaign=state.campaign_id,system=state.system_id,mode=result['mode']); return deepcopy(result)
