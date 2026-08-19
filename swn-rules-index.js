@@ -1,0 +1,22 @@
+(function(global){
+  'use strict';
+  // Índice conciso derivado do Stars Without Number: Revised Edition.
+  // Não substitui o livro: serve como evidência local/proveniência para o Rule Gate.
+  const rules=[
+    {bookPage:46,section:'Saving Throws',tags:['saving','save','salvamento','physical','evasion','mental'],text:'Saving throws use 1d20 and succeed when the roll equals or exceeds the saving throw score. Natural 1 always fails and natural 20 always succeeds. Physical, Evasion and Mental saves use their listed targets.'},
+    {bookPage:47,section:'Skill Checks',tags:['skill','perícia','pericia','teste','check','difficulty'],text:'A skill check rolls 2d6 plus the relevant skill level and attribute modifier against a difficulty. A character without level-0 in the pertinent skill normally takes a -1 penalty. Checks should be called only when the outcome matters and the task is beyond ordinary competence.'},
+    {bookPage:47,section:'Skill Check Difficulties',tags:['difficulty','dificuldade','6','8','10','12','14'],text:'Common skill check difficulties are 6 for a simple but meaningful challenge, 8 for a significant professional challenge, 10 for an expert challenge, 12 for a master challenge, and 14+ for exceptional feats. Situational modifiers are normally limited to -2 through +2.'},
+    {bookPage:48,section:'Rounds and Initiative',tags:['initiative','iniciativa','round','rodada','surprise','surpresa'],text:'Combat rounds are about six seconds. Individual initiative rolls 1d8 plus Dexterity modifier, high to low, with PCs winning ties; initiative is not rerolled each round. Group initiative is an optional alternative.'},
+    {bookPage:49,section:'Hitting an Enemy',tags:['attack','ataque','hit','acertar','armor class','ac'],text:'An attack roll is 1d20 plus attack bonus, relevant combat skill, and the weapon’s relevant attribute modifier. Equaling or exceeding Armor Class hits. Lacking level-0 in the weapon skill gives -2 to hit.'},
+    {bookPage:49,section:'Damage and Shock',tags:['damage','dano','shock','choque'],text:'A successful weapon attack inflicts its damage die plus the relevant attribute modifier. Melee weapons with Shock can inflict their Shock damage on a miss when the target Armor Class is low enough; successful melee damage cannot be lower than applicable Shock.'},
+    {bookPage:49,section:'Hit Roll Modifiers',tags:['cover','cobertura','prone','caído','firing position'],text:'Typical hit modifiers include -2 for half cover and -4 for near-total cover; a prepared firing position can grant +2. Distant prone targets are harder to shoot while adjacent prone targets are easier to attack.'},
+    {bookPage:50,section:'Make a Ranged Attack',tags:['ranged','tiro','shoot','melee','corpo a corpo'],text:'Two-handed ranged weapons cannot normally be fired while a melee-armed enemy is adjacent. One-handed ranged or thrown weapons can be used in melee at -4 to hit.'},
+    {bookPage:50,section:'Make a Snap Attack',tags:['snap attack','ataque rápido','instant'],text:'A combatant with a Readied weapon and an unused Main Action may sacrifice that Main Action as an Instant action to make a melee or ranged attack at -4 to hit.'},
+    {bookPage:50,section:'Total Defense',tags:['total defense','defesa total','shock','ac'],text:'Total Defense is an Instant action that costs the user’s Main Action, grants +2 Armor Class until their next turn, and makes them immune to melee Shock for the round.'},
+    {bookPage:50,section:'Fighting Withdrawal',tags:['withdrawal','retirada','recuo','melee'],text:'Fighting Withdrawal is a Main Action used to disengage from adjacent melee enemies so the actor can move away without giving them a free melee attack.'},
+    {bookPage:52,section:'Injury and Stabilization',tags:['mortal','stabilize','estabilizar','heal','cura'],text:'Characters reduced to zero hit points by lethal damage are mortally wounded and need stabilization according to the injury rules. Healing and stabilization use the game’s Heal procedures and System Strain limits.'},
+    {bookPage:53,section:'System Strain',tags:['system strain','strain','tensão'],text:'System Strain measures the body’s capacity for healing and augmentation. A character normally cannot benefit from effects that would push System Strain beyond Constitution, and resting reduces accumulated strain under suitable conditions.'}
+  ];
+  Object.freeze(rules); global.XWN_SWN_RULE_INDEX=rules;
+  if(typeof module!=='undefined'&&module.exports)module.exports=rules;
+})(typeof window!=='undefined'?window:globalThis);
