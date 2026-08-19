@@ -21,15 +21,18 @@ class CampaignState:
     player_state:dict=field(default_factory=dict)
     scene:dict=field(default_factory=dict)
     notes:dict=field(default_factory=dict)
+    sites:dict=field(default_factory=dict)
+    public_ledger:list=field(default_factory=list)
+    secret_ledger:list=field(default_factory=list)
     def snapshot(self): return deepcopy(self)
     def validate(self):
         if not isinstance(self.campaign_id,str) or not self.campaign_id: raise ValueError('invalid_campaign_id')
         if not isinstance(self.system_id,str) or not self.system_id: raise ValueError('invalid_system_id')
         if not isinstance(self.tick,int) or isinstance(self.tick,bool) or self.tick<0: raise ValueError('invalid_tick')
         if not isinstance(self.location,str): raise ValueError('invalid_location')
-        for name in ('facts','world_flags','npcs','factions','clocks','economy','weather','player_state','scene','notes'):
+        for name in ('facts','world_flags','npcs','factions','clocks','economy','weather','player_state','scene','notes','sites'):
             if not isinstance(getattr(self,name),dict): raise ValueError('invalid_'+name)
-        for name in ('rumors','events','memory'):
+        for name in ('rumors','events','memory','public_ledger','secret_ledger'):
             if not isinstance(getattr(self,name),list): raise ValueError('invalid_'+name)
         return True
     def to_dict(self): self.validate(); return deepcopy(asdict(self))
