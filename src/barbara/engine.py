@@ -16,14 +16,14 @@ class BarbaraEngine:
     MAX_NARRATION=20000
     _RETRIEVAL_HINTS={'combat':'combat attack ataque ataco golpe strike fight damage dano defense defesa','travel':'travel journey viagem viajo road estrada trail trilha movement movimento','investigation':'investigation investigate investigação exam examine examino search procura clue pista perception percepção','dialogue':'dialogue social conversa persuasion persuasão reaction reação influence influência','action':'action ação check teste skill perícia ability habilidade'}
     def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None,rag=None,rag_db_path=None,embedder=None,telemetry=None,adapters=None):
-        if rag is not None and rag_db_path is not None: raise ValueError('rag_configuration_conflict')
+        if rag is not None and rag_db_path is not None:raise ValueError('rag_configuration_conflict')
         self.provider=provider; self.rag=rag if rag is not None else RAG(rag_db_path); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self.adapters=adapters or AdapterRegistry(); self._requests={}
-    def _fingerprint(self,state,text,mechanical,importance): return (state.campaign_id,state.system_id,text,mechanical,importance)
+    def _fingerprint(self,state,text,mechanical,importance):return (state.campaign_id,state.system_id,text,mechanical,importance)
     def _retrieval_query(self,text,plan,mechanical=False):
         q=str(text)
         if mechanical and plan.get('mode')=='fiction':
             hint=self._RETRIEVAL_HINTS.get(plan.get('kind'),'')
-            if hint: q=f'{q} {hint}'
+            if hint:q=f'{q} {hint}'
         return q
     def _query_vector(self,text):
         if self.embedder is None:return None
@@ -41,8 +41,7 @@ class BarbaraEngine:
     def _public_world_context(self,state):
         site=deepcopy(state.sites.get(state.location,{})) if state.location else {}; ledger=[deepcopy(e) for e in state.public_ledger[-20:] if isinstance(e,dict) and (e.get('origin') in {None,state.location} or state.location=='')]; return {'site':public_view(site),'ledger':public_view(ledger)}
     def narrator_context(self,state,evidence,text='',importance='normal',turn_plan=None):
-        safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]; qcount=self.narrative.question_count(text); world=self._public_world_context(state)
-        memories=self.memory.compact_context(state,query=text,location=state.location)
+        safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]; qcount=self.narrative.question_count(text); world=self._public_world_context(state); memories=self.memory.compact_context(state,query=text,location=state.location)
         return public_view({'location':state.location,'facts':state.facts,'memory':memories,'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'site':world['site'],'public_ledger':world['ledger'],'evidence':safe,'system_profile':self._system_profile(state),'narrative_policy':self.narrative.narrator_directives(importance,qcount,turn_plan)})
     def _validate_provider_output(self,out,state,evidence,context,user_text,importance='normal'):
         if isinstance(out,str):out={'narration':out,'claims':[],'state_patch':[]}
@@ -51,7 +50,8 @@ class BarbaraEngine:
         narration=out.get('narration'); claims=out.get('claims',[]); patches=out.get('state_patch',[])
         if not isinstance(narration,str) or not narration.strip() or len(narration)>self.MAX_NARRATION:raise ValueError('invalid_narration')
         if len(narration)<self.narrative.minimum_acceptable_chars(importance):raise ValueError('narrativa_resumida_demais')
-        self.narrative.validate_player_agency(user_text,narration); claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state),public_context=context)
+        self.narrative.validate_player_agency(user_text,narration); self.narrative.validate_response_coverage(user_text,narration); self.narrative.validate_scene_ending(narration,importance)
+        claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state),public_context=context)
         if not isinstance(patches,list):raise ValueError('invalid_state_patch')
         for p in patches:
             if not isinstance(p,dict) or set(p)!={'path','value'}:raise ValueError('invalid_patch_entry')
