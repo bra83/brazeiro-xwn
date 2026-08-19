@@ -1,5 +1,5 @@
-PROTECTED_ROOTS={"campaign_id","system_id","tick","facts","world_flags","npcs","factions","rumors","events","economy","clocks","weather","living_world","authorizations"}
-SENSITIVE_KEYS={"private_agenda","secret","secrets","director_notes","has_private_agenda","private_goal","private_goals","hidden_goal","hidden_goals","knowledge_private","gm_only","director_only"}
+PROTECTED_ROOTS={"campaign_id","system_id","tick","facts","world_flags","npcs","factions","rumors","events","economy","clocks","weather","living_world","authorizations","sites","public_ledger","secret_ledger"}
+SENSITIVE_KEYS={"private_agenda","secret","secrets","director_notes","has_private_agenda","private_goal","private_goals","hidden_goal","hidden_goals","knowledge_private","gm_only","director_only","secret_ledger"}
 PRIVATE_VISIBILITY={"private","director","gm","gm_only","director_only"}
 _DROP=object()
 
@@ -29,8 +29,6 @@ def _public(value):
 
 def public_view(value):
     cleaned=_public(value)
-    # Top-level private objects become an empty public object instead of None,
-    # avoiding accidental fallback to the original unsanitized value by callers.
     return {} if cleaned is _DROP else cleaned
 
 def validate_patch(path,value):
