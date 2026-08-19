@@ -28,4 +28,7 @@
     console.warn('Narrativa Gemini descartada; mantendo scaffold determinístico.',last);return null;
   }
   global.XWNGMBridge={MODELS,getKey,setKey,enabled,setEnabled,refineNarrative};
+  // O host antigo é carregado antes da UI. Ativamos a correção 3.7 como camada separada
+  // para não depender dos bytes de regex defeituosos herdados de builds antigas.
+  if(typeof document!=='undefined'&&!global.XWN4RulesFixLoading){global.XWN4RulesFixLoading=true;const s=document.createElement('script');s.src='xwn4-rules-fix.js';s.async=false;s.onload=()=>{global.XWN4RulesFixLoaded=true;};s.onerror=()=>console.error('Falha ao carregar xwn4-rules-fix.js');document.head.appendChild(s);}
 })(window);
