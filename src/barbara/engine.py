@@ -30,7 +30,11 @@ class BarbaraEngine:
         msg=str(exc).split(':',1)[0]
         return msg if re.fullmatch(r'[A-Za-z0-9_\-]{1,80}',msg or '') else exc.__class__.__name__
     def _system_profile(self,state):
-        adapter=self.adapters.get(state.system_id); adapter.validate_campaign(state)
+        try:
+            adapter=self.adapters.get(state.system_id)
+        except KeyError as exc:
+            raise ValueError(f'unsupported_system:{state.system_id}') from exc
+        adapter.validate_campaign(state)
         return {'system_id':adapter.system_id,'family':adapter.family,'lore_scope':adapter.lore_scope,'rules_ready':adapter.rules_ready(self.rag,state.campaign_id)}
     def _public_world_context(self,state):
         site=deepcopy(state.sites.get(state.location,{})) if state.location else {}
