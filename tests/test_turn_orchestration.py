@@ -70,3 +70,9 @@ def test_mechanical_turn_still_requires_canonical_rule_before_world_tick():
     add_rule(e)
     r=e.turn(s,'Eu ataco o guarda','r2',mechanical=True)
     assert r['turn_plan']['check_required'] and s.tick==1
+
+def test_intent_aware_retrieval_does_not_authorize_unrelated_rule():
+    e=BarbaraEngine(); s=CampaignState('c','gurps')
+    e.rag.replace_source('r',[Evidence('r','poison healing recovery rule','RULE','c','gurps')])
+    with pytest.raises(LookupError): e.turn(s,'Eu ataco o guarda','r',mechanical=True)
+    assert s.tick==0
