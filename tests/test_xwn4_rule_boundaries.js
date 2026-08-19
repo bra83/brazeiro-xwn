@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('assert');global.window=global;
+const store=new Map();global.localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
+require('../systems.js');require('../adapters.js');require('../rules-index.js');require('../swn-rules-index.js');require('../hex-library.js');const E=require('../engine.js');require('../xwn4-runtime.js');require('../xwn4-rules-fix.js');
+E.setActiveSystem('WWN');const s=E.makeInitialState('WWN');
+const moral=E.queryRules(s,'Como funciona moral?');assert.match(moral,/2d6/i);assert.match(moral,/Moral/i);
+const attack=E.queryRules(s,'Como funciona ataque?');assert.match(attack,/1d20/i);assert.match(attack,/penalidade.*-2/i);
+const ac=E.queryRules(s,'Como eu acerto a AC?');assert.match(ac,/igualar ou superar a AC/i);
+const indexed=E.queryRulesIndexed(s,'Como funciona moral?',global.XWN_RULE_INDEX);assert.match(indexed,/WWN SRD p\. 80/i);
+console.log('XWN 3.7 quick-rule boundaries OK: moral, ataque, acertar/AC');
