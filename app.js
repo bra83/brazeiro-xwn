@@ -95,7 +95,7 @@
     $('worldEventList').innerHTML=(state.world.publicEvents||[]).slice(0,10).map(e=>`<div class="world-event"><b>Dia ${e.day}</b> ${escapeHtml(e.text)}</div>`).join('')||'<p class="muted-note">Nenhuma mudança pública chegou até o personagem.</p>';
   }
   function renderJournal(){$('journalList').innerHTML=(state.journal||[]).map(j=>`<article class="journal-entry"><small>${escapeHtml(j.when)} • ${escapeHtml(j.type)}</small><p>${escapeHtml(j.text)}</p></article>`).join('')}
-  function renderHexLibrary(){$('hexLibraryGrid').innerHTML=HEX_LIBRARY.map(x=>`<div class="hex-library-item"><img src="assets/hex_full/${escapeHtml(x.id)}.png" alt=""><span>${escapeHtml(x.terrain)} · ${escapeHtml(x.variant)}</span></div>`).join('')}
+  function renderHexLibrary(){$('hexLibraryGrid').innerHTML=HEX_LIBRARY.map(x=>`<div class="hex-library-item"><img src="${escapeHtml(x.file||`assets/hex_full/${x.id}.png`)}" alt=""><span>${escapeHtml(x.terrain)} · ${escapeHtml(x.variant)}</span></div>`).join('')}
   function renderRulesStatus(){$('ruleIndexStatus').textContent=`Índice offline: ${RULE_INDEX.length} páginas mecânicas do WWN SRD.`}
 
   function renderSceneImage(){const latest=(state.visual.sceneImages||[])[0],frame=$('sceneImageFrame');if(!latest){frame.hidden=true;return}frame.hidden=false;$('sceneImage').src=latest.dataUrl;$('sceneImageCaption').textContent=latest.caption||state.sceneTitle||'Imagem da cena'}
