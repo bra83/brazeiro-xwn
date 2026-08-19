@@ -4,12 +4,7 @@ import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import org.json.JSONObject
 
-/**
- * Thin Kotlin boundary for the Barbara engine embedded in the APK/AAB.
- *
- * The app owns persistence and UI. Barbara owns RPG orchestration.  Only JSON crosses
- * this boundary, so game projects never depend on Barbara's internal Python classes.
- */
+/** Thin Kotlin boundary for the Barbara engine embedded in the APK/AAB. */
 class BarbaraGateway(private val python: Python = Python.getInstance()) {
     private val module: PyObject by lazy { python.getModule("barbara.android") }
 
@@ -19,14 +14,14 @@ class BarbaraGateway(private val python: Python = Python.getInstance()) {
         ragDbPath: String?,
         useGemini: Boolean = true,
     ): JSONObject {
-        val result = module.callAttr(
-            "configure",
+        val raw = module.callAttr(
+            "configure_json",
             PyObject.fromJava(apiKey),
             PyObject.fromJava(model),
             PyObject.fromJava(ragDbPath),
             PyObject.fromJava(useGemini),
-        )
-        return JSONObject(result.toString())
+        ).toString()
+        return JSONObject(raw)
     }
 
     fun newCampaign(campaignId: String, systemId: String): String =
