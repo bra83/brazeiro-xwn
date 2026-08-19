@@ -40,14 +40,14 @@ class BarbaraEngine:
         safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]
         qcount=self.narrative.question_count(text); world=self._public_world_context(state)
         return public_view({'location':state.location,'facts':state.facts,'memory':self.memory.compact_context(state),'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'site':world['site'],'public_ledger':world['ledger'],'evidence':safe,'system_profile':self._system_profile(state),'narrative_policy':self.narrative.narrator_directives(importance,qcount)})
-    def _validate_provider_output(self,out,state,evidence,importance='normal'):
+    def _validate_provider_output(self,out,state,evidence,context,importance='normal'):
         if isinstance(out,str): out={'narration':out,'claims':[],'state_patch':[]}
         if not isinstance(out,dict): raise ValueError('invalid_provider_output')
         if set(out)-{'narration','claims','state_patch'}: raise ValueError('unknown_provider_field')
         narration=out.get('narration'); claims=out.get('claims',[]); patches=out.get('state_patch',[])
         if not isinstance(narration,str) or not narration.strip() or len(narration)>self.MAX_NARRATION: raise ValueError('invalid_narration')
         if len(narration)<self.narrative.minimum_acceptable_chars(importance): raise ValueError('narrativa_resumida_demais')
-        claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state))
+        claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state),public_context=context)
         if not isinstance(patches,list): raise ValueError('invalid_state_patch')
         for p in patches:
             if not isinstance(p,dict) or set(p)!={'path','value'}: raise ValueError('invalid_patch_entry')
@@ -83,7 +83,7 @@ class BarbaraEngine:
             context=self.narrator_context(state,evidence,text,importance)
             result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':mode,'world_advanced':mode=='fiction','importance':importance,'system_profile':profile}
             if self.provider:
-                raw=self.recovery.run(lambda:self.provider.generate(text,context,state)); validated=self._validate_provider_output(raw,state,evidence,importance)
+                raw=self.recovery.run(lambda:self.provider.generate(text,context,state)); validated=self._validate_provider_output(raw,state,evidence,context,importance)
                 self._apply_patches(state,validated['state_patch']); result.update(validated)
         except Exception as exc:
             state.__dict__.clear(); state.__dict__.update(before.__dict__); self.telemetry.record('reject',self._error_code(exc),campaign=state.campaign_id,system=state.system_id); raise
