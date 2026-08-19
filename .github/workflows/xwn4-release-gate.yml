@@ -17,7 +17,7 @@ jobs:
       - name: Checkout pinned XWN candidate
         uses: actions/checkout@v4
         with:
-          ref: 2e2e94a7c29d497e69ef35c7a239b79088600e42
+          ref: 2e2cf82d6dd4e2c2ab84872826939fe823dc1129
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -31,15 +31,29 @@ jobs:
           set -euo pipefail
           for f in engine.js systems.js adapters.js swn-rules-index.js xwn4-runtime.js xwn4-rules-fix.js xwn4-compat.js xwn4-mechanics-fix.js xwn4-migration.js xwn4-combat-bridge.js barbara-browser.js audioEngineV2.js local-audio-library.js snapshot-store.js gmBridge.js app.js xwn4-ui.js; do node --check "$f"; done
       - name: Legacy regression
-        run: node tests/test_engine.js | tee /tmp/legacy.log
-      - name: XWN 3.7 quick rules
-        run: node tests/test_xwn4_rule_boundaries.js | tee /tmp/rulefix.log
-      - name: XWN 4 runtime fuzz
-        run: node tests/test_xwn4_runtime.js | tee /tmp/xwn4.log
-      - name: Static parity
-        run: python tests/test_xwn4_static.py | tee /tmp/static.log
-      - name: Chromium harness
+        shell: bash
         run: |
+          set -euo pipefail
+          node tests/test_engine.js | tee /tmp/legacy.log
+      - name: XWN 3.7 quick rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/test_xwn4_rule_boundaries.js | tee /tmp/rulefix.log
+      - name: XWN 4 runtime fuzz
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/test_xwn4_runtime.js | tee /tmp/xwn4.log
+      - name: Static parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tests/test_xwn4_static.py | tee /tmp/static.log
+      - name: Chromium harness
+        shell: bash
+        run: |
+          set -euo pipefail
           npm init -y >/dev/null 2>&1
           npm install --silent playwright@1.55.0
           npx playwright install --with-deps chromium >/dev/null
@@ -58,7 +72,7 @@ jobs:
           set -euo pipefail
           {
             echo 'BRASEIRO XWN 4.0.0 — FINAL RELEASE GATE'
-            echo 'Source: 2e2e94a7c29d497e69ef35c7a239b79088600e42'
+            echo 'Source: 2e2cf82d6dd4e2c2ab84872826939fe823dc1129'
             echo "Actions run: $GITHUB_RUN_ID"
             echo
             cat /tmp/legacy.log
@@ -105,7 +119,7 @@ jobs:
           mkdir -p exported
           printf '%s\n' "$GITHUB_RUN_ID" > exported/run_id.txt
           printf '%s\n' "$JOB_STATUS" > exported/status.txt
-          printf '%s\n' '2e2e94a7c29d497e69ef35c7a239b79088600e42' > exported/source_commit.txt
+          printf '%s\n' '2e2cf82d6dd4e2c2ab84872826939fe823dc1129' > exported/source_commit.txt
           [ -f VALIDACAO_XWN_4.0.0_FINAL.txt ] && cp VALIDACAO_XWN_4.0.0_FINAL.txt exported/ || true
           [ -f Braseiro_XWN_4.0.0_MOTOR_BARBARA.sha256 ] && cp Braseiro_XWN_4.0.0_MOTOR_BARBARA.sha256 exported/ || true
           git add exported
