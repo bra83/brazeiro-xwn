@@ -35,9 +35,11 @@ def test_unresolved_mechanical_outcome_cannot_be_invented_by_narrator():
 
 def test_host_resolution_authorizes_outcome_and_reaches_context():
     p=P({'narration':'Você acerta o guarda e causa dano.','claims':[],'state_patch':[]}); e=BarbaraEngine(p); add_attack_rule(e); s=CampaignState('c','gurps')
-    resolution={'outcome':'success','roll':12,'target':10,'source':'dice'}
+    resolution={'outcome':'success','roll':12,'target':10,'source':'dice'}; original=dict(resolution)
     r=e.turn(s,'Eu ataco o guarda','r',mechanical=True,resolution=resolution)
-    assert r['resolution']==resolution and p.context['resolution']==resolution and s.tick==1
+    expected={**resolution,'system_id':'gurps','family':'gurps'}
+    assert r['resolution']==expected and p.context['resolution']==expected and s.tick==1
+    assert resolution==original
 
 def test_untrusted_or_malformed_resolution_fails_before_world_tick():
     for resolution in [ {'outcome':'success','source':'gemini'}, {'outcome':'maybe','source':'host'}, {'outcome':'success','roll':True}, {'outcome':'success','hack':1} ]:
