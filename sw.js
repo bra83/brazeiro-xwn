@@ -3,7 +3,7 @@ const SHARE_CACHE='braseiro-shares-v1';
 const SHARE_KEY='./__shared_scene_image__';
 const CORE=[
   './','./index.html','./styles.css','./app.js','./engine.js','./systems.js','./adapters.js',
-  './xwn4-runtime.js','./xwn4-compat.js','./xwn4-migration.js','./xwn4-combat-bridge.js','./xwn4-ui.js',
+  './xwn4-runtime.js','./xwn4-compat.js','./xwn4-mechanics-fix.js','./xwn4-migration.js','./xwn4-combat-bridge.js','./xwn4-ui.js',
   './barbara-browser.js','./audioEngineV2.js','./local-audio-library.js','./snapshot-store.js','./gmBridge.js',
   './rules-index.js','./swn-rules-index.js','./hex-library.js','./manifest.webmanifest','./assets/app-icon.svg',
   './assets/domain/space.svg','./assets/domain/urban.svg','./assets/domain/wasteland.svg'
