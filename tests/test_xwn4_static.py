@@ -6,7 +6,7 @@ def ok(v,msg):
     global checks; checks+=1
     if not v: raise AssertionError(msg)
 def text(p): return (ROOT/p).read_text('utf-8')
-idx=text('index.html'); app=text('app.js'); css=text('styles.css'); sw=text('sw.js'); manifest=json.loads(text('manifest.webmanifest'))
+idx=text('index.html'); app=text('app.js'); css=text('styles.css'); sw=text('sw.js'); ui=text('xwn4-ui.js'); manifest=json.loads(text('manifest.webmanifest'))
 required_scripts=['systems.js','adapters.js','hex-library.js','rules-index.js','swn-rules-index.js','engine.js','xwn4-runtime.js','xwn4-compat.js','xwn4-mechanics-fix.js','xwn4-migration.js','xwn4-combat-bridge.js','barbara-browser.js','audioEngineV2.js','local-audio-library.js','snapshot-store.js','gmBridge.js','app.js','xwn4-ui.js']
 pos=[]
 for s in required_scripts:
@@ -20,7 +20,7 @@ for p in ['assets/domain/space.svg','assets/domain/urban.svg','assets/domain/was
 ok((ROOT/'assets/app-icon.svg').is_file(),'missing app icon')
 ids=set(re.findall(r'id="([A-Za-z0-9_-]+)"',idx))
 for ref in sorted(set(re.findall(r"\$\('([^']+)'\)",app))): ok(ref in ids,f'app references absent DOM id {ref}')
-ok('[hidden]{display:none!important}' in css.replace(' ',''),'hidden CSS invariant missing')
+ok('[hidden]{display:none!important}' in (css+ui).replace(' ',''),'hidden CSS invariant missing')
 ok('BRASEIRO XWN 4.0' in idx,'visible version missing')
 ok('Motor Barbara' in manifest['name'],'manifest not Barbara-branded')
 ok(manifest.get('share_target',{}).get('method')=='POST','share target lost')
@@ -44,7 +44,6 @@ ok('BarbaraBrowser.validate' in gm and 'BarbaraBrowser.commitExperience' in gm,'
 ok('indexedDB' in text('local-audio-library.js'),'local audio persistence missing')
 ok('indexedDB' in text('snapshot-store.js'),'snapshot persistence missing')
 ok('twoHanded' in mechanics and 'ammo' in mechanics,'SWN portable weapon metadata missing')
-ui=text('xwn4-ui.js')
 for feature in ['Exportar ficha JSON','Importar ficha JSON','Salvar snapshot local','DADOS VIRTUAIS','MÚSICA / AMBIÊNCIA LOCAL','COMBATE TÁTICO SWN']:
     ok(feature in ui,f'parity UI missing {feature}')
 for bad in ['\x08moral','\x08ataque','\x08acertar']:
