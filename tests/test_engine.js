@@ -13,7 +13,7 @@ ok(s.atlas.orientation==='flat','flat orientation');
 eq(Object.values(s.hexes).filter(h=>h.discovered).map(h=>h.key),['0,0'],'only start revealed');
 ok(Object.values(s.hexes).every(h=>String(h.tile).startsWith('assets/hex_full/')),'full bleed tiles');
 ok(new Set(Object.values(s.hexes).map(h=>h.tile)).size>=20,'tile diversity');
-eq(global.XWN_HEX_LIBRARY.length,30,'30 library variants');
+eq(global.XWN_HEX_LIBRARY.length,44,'44 library variants');
 ok(s.continuity&&Array.isArray(s.continuity.actionLedger),'continuity ledger exists');
 ok(Array.isArray(s.world.secretLedger)&&Array.isArray(s.world.factionTraffic),'world ledgers exist');
 
@@ -27,7 +27,6 @@ eq(Object.values(fog.hexes).filter(h=>h.discovered).length,2,'no neighbor ring r
 ok(beforeHidden-Object.values(fog.hexes).filter(h=>!h.discovered).length===1,'exactly one new hex revealed');
 ok(fog.continuity.actionLedger.some(x=>x.type==='movement'&&x.to==='1,0'),'movement immutable ledger');
 ok(Object.keys(fog.continuity.familiarRoutes).length===1,'familiar route cache');
-// Avoid pending encounter for exploration assertion.
 fog.combat=null; fog.encounter=null; const discoveredBeforeExplore=Object.values(fog.hexes).filter(h=>h.discovered).length; E.exploreCurrentHex(fog);
 eq(Object.values(fog.hexes).filter(h=>h.discovered).length,discoveredBeforeExplore,'explore does not reveal neighbors');
 ok(fog.continuity.actionLedger.some(x=>x.type==='exploration'),'exploration ledger');
@@ -56,7 +55,6 @@ const after=JSON.stringify({day:qstate.campaign.day,hour:qstate.campaign.hour,cu
 let legacy=E.makeInitialState();legacy.version='1.5.0';legacy.atlas.radius=3;delete legacy.continuity;delete legacy.world.rumorConfidence;delete legacy.npcs.selka;Object.values(legacy.hexes).forEach(h=>{delete h.tile; h.discovered=true; h.visited=false; h.explored=false});legacy.hexes['0,0'].visited=true;legacy.hexes['0,0'].explored=true;let mig=E.importState(JSON.stringify(legacy));
 eq(Object.keys(mig.hexes).length,61,'migration expands atlas');eq(Object.values(mig.hexes).filter(h=>h.discovered).length,1,'migration removes old radial fog reveal');ok(!!mig.npcs.selka,'migration restores canonical NPCs');ok(mig.continuity&&Array.isArray(mig.continuity.actionLedger),'migration adds continuity');ok(Object.values(mig.hexes).every(h=>h.tile&&h.tile.startsWith('assets/hex_full/')),'migration full bleed tiles');
 
-
 // Narrative quality: table-GM density and no automatic explanatory padding.
 let narr=E.makeInitialState();let arrival=E.sceneForHex(narr.hexes['0,0'],narr,'arrival');ok(arrival.length<=3,'arrival max 3 beats');ok(arrival.join(' ').length<900,'arrival concise enough for live table');ok(!/o que importa agora|transforma.*pano de fundo|merece atenção própria/i.test(arrival.join(' ')),'no self-commentary prose');
 
@@ -67,5 +65,5 @@ ok(!css.includes('.road-stroke'),'old road stroke removed');ok(css.includes('.ma
 ok(audio.includes('gemini-3.1-flash-tts-preview')&&audio.includes('gemini-2.5-flash-preview-tts'),'Forbidden Lands TTS chain');ok(audio.includes('Charon'),'Charon voice');ok(audio.includes('320')&&audio.includes('680'),'fast chunk profile');
 for(const tab of ['play','character','journal','rules','world','audio','settings'])ok(html.includes(`data-page="${tab}"`),`tab ${tab}`);
 const ids=[...app.matchAll(/\$\('([^']+)'\)/g)].map(m=>m[1]);const missing=[...new Set(ids)].filter(id=>!new RegExp(`id=["']${id}["']`).test(html));eq(missing,[],'all app DOM ids exist');
-const fullDir=path.join(root,'assets','hex_full');const pngs=fs.readdirSync(fullDir).filter(x=>x.endsWith('.png'));ok(pngs.length>=30,'30+ full bleed png assets');
+const fullDir=path.join(root,'assets','hex_full');const pngs=fs.readdirSync(fullDir).filter(x=>x.endsWith('.png'));ok(pngs.length>=30,'30+ preserved full bleed png assets');
 console.log(`PASS ${count} assertions — BRASEIRO XWN WWN ${E.VERSION}`);
