@@ -1,0 +1,30 @@
+(function(global){
+  'use strict';
+  const MOTOR_VERSION='1.0.0';
+  const MOTOR_COMMIT='a31fdb9f9e361fc81b6a5f25c7646450311d0ce3';
+  const STORY_TARGETS={campaign_opening:[900,2200],first_arrival:[750,1800],changed_return:[600,1500],continuation:[350,900]};
+  const deliberative=/\b(talvez|penso em|considero|quem sabe|maybe|perhaps|i consider|i think about)\b/i;
+  const forced=/\b(você|you)\s+(abre|ataca|mata|pega|entra|vai|aceita|pula|corre|dispara|empurra|usa|open|attack|kill|take|enter|go|accept|jump|run|shoot|push|use)\b/i;
+  function clean(v){return String(v??'').trim();}
+  function hash(str){let h=2166136261>>>0;for(const c of String(str)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return (h>>>0).toString(16);}
+  function currentLocation(state){const k=state?.current?`${state.current.q},${state.current.r}`:'';const h=state?.hexes?.[k];return `${state?.campaign?.system||'WWN'}|${k}|${h?.poi?.name||h?.systemLabel||h?.domainTerrain||h?.terrain||''}`;}
+  function materialFingerprint(state){const k=state?.current?`${state.current.q},${state.current.r}`:'';const h=state?.hexes?.[k]||{};const material={day:state?.campaign?.day,weather:state?.campaign?.weather,location:k,notes:h.notes||[],poi:h.poi||null,publicEvents:(state?.world?.publicEvents||[]).slice(0,12),clocks:(state?.world?.clocks||[]).filter(x=>x?.public),factions:(state?.factions||[]).filter(x=>x?.known).map(x=>({id:x.id,progress:x.progress,location:x.location}))};return hash(JSON.stringify(material));}
+  function ensure(state){state.barbara ||= {version:MOTOR_VERSION,commit:MOTOR_COMMIT,discovery:{},lastOccasion:'campaign_opening'};state.barbara.discovery ||= {};return state.barbara;}
+  function nonAdvancing(text){return /^\s*(regra|regras|como funciona|dúvida|duvida|meta|ooc|planejo|vamos planejar)\b/i.test(clean(text));}
+  function occasion(state,action=''){
+    if(nonAdvancing(action))return 'continuation';const b=ensure(state),loc=currentLocation(state),fp=materialFingerprint(state);const hasStory=(state?.journal||[]).length>0&&(state?.continuity?.actionLedger||[]).length>0;
+    if(!b.started&&!hasStory)return 'campaign_opening';const seen=b.discovery[loc];if(!seen)return b.started?'first_arrival':'campaign_opening';if(seen.fingerprint&&seen.fingerprint!==fp)return 'changed_return';return 'continuation';
+  }
+  function plan(state,action='',importance='normal'){
+    const occ=occasion(state,action),target=STORY_TARGETS[occ]||STORY_TARGETS.continuation;const questions=(clean(action).match(/\?/g)||[]).length;return {engine:'Motor Barbara',version:MOTOR_VERSION,commit:MOTOR_COMMIT,occasion:occ,mode:nonAdvancing(action)?'meta':'fiction',target_chars:target,question_count:questions,directives:{player_knows_only_experienced_world:true,dramatize_world_instead_of_reporting_it:true,campaign_opening_must_be_story:true,first_arrival_must_be_story:true,changed_return_must_be_story:true,choices_come_after_scene_not_instead_of_scene:true,show_weather_economy_war_politics_culture_through_perceivable_fiction:true,world_already_moving:true,npc_knowledge_is_limited:true,rumor_is_not_truth:true,player_character_control_is_human_only:true,checks_only_for_meaningful_uncertainty:true,basic_conversation_needs_no_social_check:true,essential_clue_never_single_roll_gate:true,rules_outside_narrative:true,anti_summary:true,answer_all_relevant_questions:true}};
+  }
+  function sentences(text){return clean(text).split(/(?<=[.!?])\s+|\n+/).map(x=>x.trim()).filter(Boolean);}
+  function validate(state,action,narration,p){
+    p=p||plan(state,action);const text=clean(narration),errors=[];if(!text)errors.push('invalid_narration');if(deliberative.test(clean(action))&&forced.test(text))errors.push('player_agency_violation');if(p.question_count>1&&sentences(text).length<p.question_count)errors.push('perguntas_nao_respondidas');if(['campaign_opening','first_arrival','changed_return'].includes(p.occasion)){const min=STORY_TARGETS[p.occasion][0];if(text.length<Math.floor(min*.55))errors.push('historia_de_abertura_resumida_demais');if(/^(resumo|contexto|situação atual|estado atual|summary|current situation)\s*:/i.test(text))errors.push('historia_substituida_por_relatorio');if(sentences(text).length<4)errors.push('historia_sem_cena_suficiente');}
+    // Metadados crus do Diretor não podem aparecer como relatório de estado.
+    if(/\b(economia|economy)\s*[:=]\s*[-+]?\d|\b(weather|clima)\s*[:=]|\bworld_flags\b|\btruth_status\b|\bprivate_agenda\b/i.test(text))errors.push('estado_do_mundo_despejado_como_relatorio');return {valid:!errors.length,errors,occasion:p.occasion};
+  }
+  function commitExperience(state,p){if(!p||p.mode!=='fiction')return;const b=ensure(state),loc=currentLocation(state);b.started=true;b.lastOccasion=p.occasion;b.discovery[loc]={fingerprint:materialFingerprint(state),day:state?.campaign?.day||1,hour:state?.campaign?.hour||0};const keys=Object.keys(b.discovery);if(keys.length>500)for(const k of keys.slice(0,keys.length-500))delete b.discovery[k];}
+  function narratorEnvelope(state,action,scaffold){const p=plan(state,action),sys=global.XWN_SYSTEMS?.[state?.campaign?.system]||{};return {barbara:p,contract:{assume_player_does_not_know_current_world_state:true,story_before_choices:true,show_world_state_through_perceivable_consequences:true,never_dump_director_state:true},system:{id:state?.campaign?.system,label:sys.label,genre:sys.genre},world_public:{day:state?.campaign?.day,hour:state?.campaign?.hour,weather:state?.campaign?.weather,publicEvents:(state?.world?.publicEvents||[]).slice(0,10),knownFactions:(state?.factions||[]).filter(x=>x?.known).map(x=>({name:x.name,goal:x.goal,progress:x.progress}))},player_action:clean(action),scaffold:Array.isArray(scaffold)?scaffold:[]};}
+  const api={MOTOR_VERSION,MOTOR_COMMIT,STORY_TARGETS,plan,validate,commitExperience,narratorEnvelope,occasion,materialFingerprint,currentLocation};global.BarbaraBrowser=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
+})(typeof window!=='undefined'?window:globalThis);
