@@ -18,7 +18,8 @@ def test_explicit_roll_intent_cannot_bypass_rule_gate_with_false_flag():
 def test_explicit_roll_intent_uses_rule_when_available():
     e=BarbaraEngine(); add_attack_rule(e); s=CampaignState('c','gurps')
     r=e.turn(s,'Faço um teste de ataque','r',mechanical=False)
-    assert r['turn_plan']['check_required'] is True and s.tick==1
+    assert r['turn_plan']['check_required'] is True
+    assert r['phase']=='WAITING_FOR_ROLL' and s.tick==0
 
 def test_rule_meta_with_provider_requires_canonical_evidence_and_freezes_world():
     p=P({'narration':'Use a regra recuperada.','claims':[],'state_patch':[]}); e=BarbaraEngine(p); s=CampaignState('c','gurps')
