@@ -1,5 +1,5 @@
 from pathlib import Path
-import json,re,sys
+import json,re
 ROOT=Path(__file__).resolve().parents[1]
 checks=0
 def ok(v,msg):
@@ -13,12 +13,11 @@ for s in required_scripts:
     ok(f'src="{s}"' in idx,f'missing script {s}')
     pos.append(idx.index(f'src="{s}"'))
 ok(pos==sorted(pos),'script order is unsafe')
-for p in required_scripts:
-    ok((ROOT/p).is_file(),f'missing runtime file {p}')
-for p in ['assets/domain/space.svg','assets/domain/urban.svg','assets/domain/wasteland.svg','assets/app-icon.svg']:
+for p in required_scripts: ok((ROOT/p).is_file(),f'missing runtime file {p}')
+for p in ['assets/domain/space.svg','assets/domain/urban.svg','assets/domain/wasteland.svg']:
     ok((ROOT/p).is_file(),f'missing asset {p}')
-    if p.endswith('.svg'):
-        s=text(p);ok('width="224"' in s and 'height="194"' in s,f'bad domain tile dimensions {p}')
+    s=text(p);ok('width="224"' in s and 'height="194"' in s,f'bad domain tile dimensions {p}')
+ok((ROOT/'assets/app-icon.svg').is_file(),'missing app icon')
 ids=set(re.findall(r'id="([A-Za-z0-9_-]+)"',idx))
 for ref in sorted(set(re.findall(r"\$\('([^']+)'\)",app))): ok(ref in ids,f'app references absent DOM id {ref}')
 ok('[hidden]{display:none!important}' in css.replace(' ',''),'hidden CSS invariant missing')
@@ -37,13 +36,14 @@ ok("WWN:{" in systems and "corpusReady:true" in systems,'WWN rules not ready')
 ok("SWN:{" in systems and systems.count('corpusReady:true')>=2,'SWN rules not ready')
 ok("CWN:{" in systems and "corpusReady:false" in systems,'CWN fail-closed profile missing')
 ok("AWN:{" in systems and systems.count('corpusReady:false')>=2,'AWN fail-closed profile missing')
-runtime=text('xwn4-runtime.js');barbara=text('barbara-browser.js');gm=text('gmBridge.js')
+runtime=text('xwn4-runtime.js');barbara=text('barbara-browser.js');gm=text('gmBridge.js');mechanics=text('xwn4-mechanics-fix.js')
 ok("a31fdb9f9e361fc81b6a5f25c7646450311d0ce3" in runtime and "a31fdb9f9e361fc81b6a5f25c7646450311d0ce3" in barbara,'Barbara pin mismatch')
 for invariant in ['campaign_opening','first_arrival','changed_return','player_knows_only_experienced_world','dramatize_world_instead_of_reporting_it']:
     ok(invariant in barbara,f'Barbara narrative invariant missing {invariant}')
 ok('BarbaraBrowser.validate' in gm and 'BarbaraBrowser.commitExperience' in gm,'Gemini bypasses Barbara validator')
 ok('indexedDB' in text('local-audio-library.js'),'local audio persistence missing')
 ok('indexedDB' in text('snapshot-store.js'),'snapshot persistence missing')
+ok('twoHanded' in mechanics and 'ammo' in mechanics,'SWN portable weapon metadata missing')
 ui=text('xwn4-ui.js')
 for feature in ['Exportar ficha JSON','Importar ficha JSON','Salvar snapshot local','DADOS VIRTUAIS','MÚSICA / AMBIÊNCIA LOCAL','COMBATE TÁTICO SWN']:
     ok(feature in ui,f'parity UI missing {feature}')
