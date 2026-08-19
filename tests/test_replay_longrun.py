@@ -29,4 +29,5 @@ def test_structured_replay_supports_mechanical_turns_with_rule():
     e=BarbaraEngine(); s=CampaignState('c','gurps')
     e.rag.replace_source('rules',[Evidence('rules','attack combat resolution','RULE','c','gurps')])
     d=ReplayHarness().run(e,s,[{'text':'attack combat','mechanical':True}])
-    assert isinstance(d,str) and len(d)==64 and s.tick==1
+    assert isinstance(d,str) and len(d)==64
+    assert s.tick==0 and s.pending_action['phase']=='WAITING_FOR_ROLL'
