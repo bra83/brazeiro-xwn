@@ -6,12 +6,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   export:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: mainrepo
+          fetch-depth: 0
       - name: Checkout preserved XWN
         uses: actions/checkout@v4
         with:
@@ -24,6 +30,21 @@ jobs:
           zip -qr ../Braseiro_XWN_PRESERVED_BACKUP.zip .
           cd ..
           sha256sum Braseiro_XWN_PRESERVED_BACKUP.zip > Braseiro_XWN_PRESERVED_BACKUP.sha256
+          base64 -w 76 Braseiro_XWN_PRESERVED_BACKUP.zip > Braseiro_XWN_PRESERVED_BACKUP.zip.b64
+      - name: Mirror encoded archive to export branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd mainrepo
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout -B xwn-export
+          mkdir -p exported
+          cp ../Braseiro_XWN_PRESERVED_BACKUP.zip.b64 exported/
+          cp ../Braseiro_XWN_PRESERVED_BACKUP.sha256 exported/
+          git add exported
+          git commit -m 'export: preserved XWN source archive [skip ci]' || true
+          git push --force origin xwn-export
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
