@@ -99,6 +99,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Publish green gate metadata
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -117,3 +118,24 @@ jobs:
           git add exported
           git commit -m 'export: XWN 4 green validation gate [skip ci]'
           git push --force origin HEAD:xwn4-export
+      - name: Publish latest run metadata
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/xwn4-meta
+          git worktree add --detach /tmp/xwn4-meta "$GITHUB_SHA"
+          cd /tmp/xwn4-meta
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout --orphan xwn4-latest-work
+          git rm -rf . >/dev/null 2>&1 || true
+          mkdir -p exported
+          printf '%s\n' "$GITHUB_RUN_ID" > exported/run_id.txt
+          printf '%s\n' "$GITHUB_SHA" > exported/source_commit.txt
+          printf '%s\n' "$JOB_STATUS" > exported/status.txt
+          git add exported
+          git commit -m 'ci: XWN 4 latest run metadata [skip ci]'
+          git push --force origin HEAD:xwn4-latest
