@@ -1,0 +1,113 @@
+name: XWN 4 final release gate
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/xwn4-release-gate.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout pinned XWN candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 2e2e94a7c29d497e69ef35c7a239b79088600e42
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in engine.js systems.js adapters.js swn-rules-index.js xwn4-runtime.js xwn4-rules-fix.js xwn4-compat.js xwn4-mechanics-fix.js xwn4-migration.js xwn4-combat-bridge.js barbara-browser.js audioEngineV2.js local-audio-library.js snapshot-store.js gmBridge.js app.js xwn4-ui.js; do node --check "$f"; done
+      - name: Legacy regression
+        run: node tests/test_engine.js | tee /tmp/legacy.log
+      - name: XWN 3.7 quick rules
+        run: node tests/test_xwn4_rule_boundaries.js | tee /tmp/rulefix.log
+      - name: XWN 4 runtime fuzz
+        run: node tests/test_xwn4_runtime.js | tee /tmp/xwn4.log
+      - name: Static parity
+        run: python tests/test_xwn4_static.py | tee /tmp/static.log
+      - name: Chromium harness
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --silent playwright@1.55.0
+          npx playwright install --with-deps chromium >/dev/null
+      - name: Real browser smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/http.log 2>&1 &
+          P=$!
+          trap 'kill $P || true' EXIT
+          sleep 2
+          node tests/browser-smoke.mjs | tee /tmp/browser.log
+      - name: Report and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'BRASEIRO XWN 4.0.0 — FINAL RELEASE GATE'
+            echo 'Source: 2e2e94a7c29d497e69ef35c7a239b79088600e42'
+            echo "Actions run: $GITHUB_RUN_ID"
+            echo
+            cat /tmp/legacy.log
+            cat /tmp/rulefix.log
+            cat /tmp/xwn4.log
+            cat /tmp/static.log
+            cat /tmp/browser.log
+            echo
+            echo 'WWN RULES READY — WWN SRD 1.0'
+            echo 'SWN RULES READY — Stars Without Number Revised'
+            echo 'CWN FAIL-CLOSED — corpus RULE principal não homologado'
+            echo 'AWN FAIL-CLOSED — corpus RULE principal não homologado'
+            echo 'Barbara 1.0.0 @ a31fdb9f9e361fc81b6a5f25c7646450311d0ce3'
+          } > VALIDACAO_XWN_4.0.0_FINAL.txt
+          mkdir -p /tmp/release/Braseiro_XWN_4.0.0_MOTOR_BARBARA
+          rsync -a --exclude '.git' --exclude 'node_modules' --exclude 'package.json' --exclude 'package-lock.json' --exclude 'releases' ./ /tmp/release/Braseiro_XWN_4.0.0_MOTOR_BARBARA/
+          cp VALIDACAO_XWN_4.0.0_FINAL.txt /tmp/release/Braseiro_XWN_4.0.0_MOTOR_BARBARA/
+          cd /tmp/release
+          zip -qr "$GITHUB_WORKSPACE/Braseiro_XWN_4.0.0_MOTOR_BARBARA.zip" Braseiro_XWN_4.0.0_MOTOR_BARBARA
+          cd "$GITHUB_WORKSPACE"
+          sha256sum Braseiro_XWN_4.0.0_MOTOR_BARBARA.zip > Braseiro_XWN_4.0.0_MOTOR_BARBARA.sha256
+          unzip -t Braseiro_XWN_4.0.0_MOTOR_BARBARA.zip >/dev/null
+      - name: Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Braseiro-XWN-4.0.0-Motor-Barbara-FINAL
+          path: |
+            Braseiro_XWN_4.0.0_MOTOR_BARBARA.zip
+            Braseiro_XWN_4.0.0_MOTOR_BARBARA.sha256
+            VALIDACAO_XWN_4.0.0_FINAL.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish final metadata
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout --orphan xwn4-final-meta
+          git rm -rf . >/dev/null 2>&1 || true
+          mkdir -p exported
+          printf '%s\n' "$GITHUB_RUN_ID" > exported/run_id.txt
+          printf '%s\n' "$JOB_STATUS" > exported/status.txt
+          printf '%s\n' '2e2e94a7c29d497e69ef35c7a239b79088600e42' > exported/source_commit.txt
+          [ -f VALIDACAO_XWN_4.0.0_FINAL.txt ] && cp VALIDACAO_XWN_4.0.0_FINAL.txt exported/ || true
+          [ -f Braseiro_XWN_4.0.0_MOTOR_BARBARA.sha256 ] && cp Braseiro_XWN_4.0.0_MOTOR_BARBARA.sha256 exported/ || true
+          git add exported
+          git commit -m 'export: XWN 4 final gate metadata [skip ci]'
+          git push --force origin HEAD:xwn4-release-final
