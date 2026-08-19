@@ -1,4 +1,5 @@
 from copy import deepcopy
+import re
 from .rag import RAG
 from .rules import RuleGate
 from .world import WorldTick
@@ -8,12 +9,28 @@ from .recovery import RecoveryPolicy
 from .narrative import NarrativePolicy
 from .knowledge import KnowledgeBoundary
 from .grounding import ClaimGrounding
+from .telemetry import Telemetry
 
 class BarbaraEngine:
     MAX_NARRATION=20000
-    def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None):
-        self.provider=provider; self.rag=RAG(); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self._requests={}
+    def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None,rag=None,rag_db_path=None,embedder=None,telemetry=None):
+        if rag is not None and rag_db_path is not None: raise ValueError('rag_configuration_conflict')
+        self.provider=provider
+        self.rag=rag if rag is not None else RAG(rag_db_path)
+        self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory()
+        self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding()
+        self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self._requests={}
     def _fingerprint(self,state,text,mechanical,importance): return (state.campaign_id,state.system_id,text,mechanical,importance)
+    def _query_vector(self,text):
+        if self.embedder is None: return None
+        fn=getattr(self.embedder,'embed',None)
+        if not callable(fn): raise ValueError('invalid_embedder')
+        vector=fn(text)
+        if not isinstance(vector,(list,tuple)) or not vector or not all(isinstance(x,(int,float)) and not isinstance(x,bool) for x in vector): raise ValueError('invalid_query_vector')
+        return tuple(float(x) for x in vector)
+    def _error_code(self,exc):
+        msg=str(exc).split(':',1)[0]
+        return msg if re.fullmatch(r'[A-Za-z0-9_\-]{1,80}',msg or '') else exc.__class__.__name__
     def narrator_context(self,state,evidence,text='',importance='normal'):
         safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]
         qcount=self.narrative.question_count(text)
@@ -35,12 +52,9 @@ class BarbaraEngine:
         for p in patches:
             parts=p['path'].split('.'); root=parts.pop(0)
             if root.startswith('player_'):
-                target=state.player_state
-                parts.insert(0,root)
-            elif root in {'scene','notes'}:
-                target=getattr(state,root)
-            else:
-                raise ValueError('patch_root_not_committable')
+                target=state.player_state; parts.insert(0,root)
+            elif root in {'scene','notes'}: target=getattr(state,root)
+            else: raise ValueError('patch_root_not_committable')
             if not parts: raise ValueError('patch_requires_leaf')
             for key in parts[:-1]:
                 current=target.get(key)
@@ -55,18 +69,24 @@ class BarbaraEngine:
         if request_id in self._requests:
             old,result=self._requests[request_id]
             if old!=fingerprint: raise ValueError('request_id_collision')
+            self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id)
             return deepcopy(result)
-        evidence=self.rag.retrieve(text,state.campaign_id,state.system_id,kinds={'RULE','LORE','MEMORY'},allow_secret=False)
-        self.rules.require(mechanical,evidence); before=state.snapshot(); mode=self.narrative.classify(text)
+        before=state.snapshot()
         try:
+            query_vector=self._query_vector(text)
+            evidence=self.rag.retrieve(text,state.campaign_id,state.system_id,kinds={'RULE','LORE','MEMORY'},allow_secret=False,query_vector=query_vector)
+            self.rules.require(mechanical,evidence); mode=self.narrative.classify(text)
             if self.narrative.advances_world(text): self.world.advance(state)
             context=self.narrator_context(state,evidence,text,importance)
             result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':mode,'world_advanced':mode=='fiction','importance':importance}
             if self.provider:
                 raw=self.recovery.run(lambda:self.provider.generate(text,context,state))
                 validated=self._validate_provider_output(raw,state,evidence,importance)
-                self._apply_patches(state,validated['state_patch'])
-                result.update(validated)
-        except Exception:
-            state.__dict__.clear(); state.__dict__.update(before.__dict__); raise
-        self._requests[request_id]=(fingerprint,deepcopy(result)); return deepcopy(result)
+                self._apply_patches(state,validated['state_patch']); result.update(validated)
+        except Exception as exc:
+            state.__dict__.clear(); state.__dict__.update(before.__dict__)
+            self.telemetry.record('reject',self._error_code(exc),campaign=state.campaign_id,system=state.system_id)
+            raise
+        self._requests[request_id]=(fingerprint,deepcopy(result))
+        self.telemetry.record('turn','ok',campaign=state.campaign_id,system=state.system_id,mode=result['mode'])
+        return deepcopy(result)
