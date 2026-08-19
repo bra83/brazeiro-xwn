@@ -1,0 +1,11 @@
+BRASEIRO XWN 4.0.0 — MOTOR BARBARA
+Commit: f718b1ebb00aa785dad3a34162e337b54ae4c0e5
+Actions run: 32216308525
+
+PASS 96 assertions — BRASEIRO XWN WWN 3.0.1
+
+WWN: RULES READY — WWN SRD 1.0
+SWN: RULES READY — Stars Without Number Revised
+CWN: FAIL-CLOSED — corpus RULE principal não empacotado
+AWN: FAIL-CLOSED — corpus RULE principal não empacotado
+Barbara: 1.0.0 @ a31fdb9f9e361fc81b6a5f25c7646450311d0ce3
