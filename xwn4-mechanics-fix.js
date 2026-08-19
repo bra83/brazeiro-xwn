@@ -2,10 +2,15 @@
   'use strict';
   const E=global.XWNEngine;if(!E?.systemId||!E.swAttack)return;
   const oldSanitize=E.sanitizeCharacter,oldMake=E.makeInitialState,oldImport=E.importState;
-  function ensureWeapon(w,raw){if(!w)return w;w.twoHanded=raw?.weapon?.twoHanded===true||w.twoHanded===true;return w;}
-  E.sanitizeCharacter=function(raw,sys){const out=oldSanitize(raw,sys);ensureWeapon(out.weapon,raw);return out;};
+  function clone(v){return JSON.parse(JSON.stringify(v));}
+  function bounded(v,min,max){const n=Number(v);return Number.isFinite(n)?Math.max(min,Math.min(max,Math.round(n))):undefined;}
+  function ensureWeapon(w,raw){if(!w)return w;w.twoHanded=raw?.weapon?.twoHanded===true||w.twoHanded===true;for(const k of ['ammo','maxAmmo']){const n=bounded(raw?.weapon?.[k],0,999);if(n!==undefined)w[k]=n;}return w;}
+  function preserveZeroes(out,raw){if(raw&&raw.ac!==undefined&&raw.ac!==null){const n=bounded(raw.ac,0,40);if(n!==undefined)out.ac=n;}if(raw&&raw.hp!==undefined&&raw.hp!==null){const n=bounded(raw.hp,0,out.maxHp||999);if(n!==undefined)out.hp=n;}return out;}
+  E.sanitizeCharacter=function(raw,sys){const out=preserveZeroes(oldSanitize(raw,sys),raw);ensureWeapon(out.weapon,raw);return out;};
   E.makeInitialState=function(sys=E.activeSystem()){const s=oldMake(sys);if(E.systemId(s.campaign.system)==='SWN')ensureWeapon(s.player.weapon,{weapon:{twoHanded:false}});return s;};
-  E.importState=function(raw){const source=typeof raw==='string'?JSON.parse(raw):JSON.parse(JSON.stringify(raw)),s=oldImport(source);ensureWeapon(s.player.weapon,source?.player);return s;};
+  E.importState=function(raw){const source=typeof raw==='string'?JSON.parse(raw):clone(raw),s=oldImport(source);preserveZeroes(s.player,source?.player);ensureWeapon(s.player.weapon,source?.player);return s;};
+  E.exportCharacter=function(state){const system=E.systemId(state?.campaign?.system),character=E.sanitizeCharacter(state?.player,system);character.weapon=ensureWeapon(clone(character.weapon||{}),state?.player);character.sourceSystem=system;return JSON.stringify({schema:'braseiro-xwn-character-1',system,exportedAt:new Date().toISOString(),character},null,2);};
+  E.importCharacter=function(state,raw){const doc=typeof raw==='string'?JSON.parse(raw):clone(raw);if(!doc||doc.schema!=='braseiro-xwn-character-1'||!doc.character)throw new Error('Ficha JSON inválida.');const system=E.systemId(state?.campaign?.system),incoming=String(doc.system||'').toUpperCase();if(incoming!==system)throw new Error('Ficha pertence a outro sistema.');const clean=E.sanitizeCharacter(doc.character,system);clean.weapon=ensureWeapon(clean.weapon,doc.character);clean.sourceSystem=system;state.player=clean;return clean;};
   function distance(a,b){return Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y));}
   function coverPenalty(combat,target){const c=(combat.board.cover||[]).find(x=>Number(x.x)===target.x&&Number(x.y)===target.y);return c?.grade==='full'?-4:c?-2:0;}
   function actor(combat,id){return combat?.actors?.find(a=>a.id===id);}
