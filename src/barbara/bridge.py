@@ -5,7 +5,7 @@ from .pipeline import ActionPipeline
 
 class HostBridge:
     """Stable JSON boundary for Android/desktop hosts integrating Barbara 1.0."""
-    REQUEST_FIELDS={'text','request_id','mechanical','importance','resolution','expected_state_version'}
+    REQUEST_FIELDS={'text','request_id','mechanical','importance','resolution','expected_state_version','resume_action_id'}
     def __init__(self,engine):
         self.engine=engine
         self.pipeline=ActionPipeline(engine)
@@ -15,10 +15,20 @@ class HostBridge:
         if not isinstance(request,dict): raise ValueError('invalid_host_request')
         unknown=set(request)-self.REQUEST_FIELDS
         if unknown: raise ValueError('unknown_host_request_fields:'+','.join(sorted(unknown)))
-        if 'text' not in request or 'request_id' not in request: raise ValueError('missing_host_request_field')
+        if 'request_id' not in request: raise ValueError('missing_host_request_field')
+        state=CampaignState.from_json(state_json)
+        if request.get('resume_action_id') is not None:
+            result=self.pipeline.resume(
+                state,
+                request['resume_action_id'],
+                request['request_id'],
+                deepcopy(request.get('resolution')),
+                expected_state_version=request.get('expected_state_version'),
+            )
+            return {'state':state.to_json(),'result':deepcopy(result)}
+        if 'text' not in request: raise ValueError('missing_host_request_field')
         text=request['text']; request_id=request['request_id']
         if not isinstance(text,str) or not text.strip(): raise ValueError('invalid_host_text')
-        state=CampaignState.from_json(state_json)
         result=self.pipeline.execute(
             state,
             text,
