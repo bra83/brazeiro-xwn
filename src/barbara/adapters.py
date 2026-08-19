@@ -18,6 +18,26 @@ _MECHANICS={
  'traveller_2e':{'roll_model':'2d6','skill_model':'2d6_target','combat_model':'2d6_attack','resource_style':'characteristics_and_damage'},
 }
 
+_COMMON_CAPABILITIES={
+    'rules.deterministic','rules.provenance','time.model','narrative.profile',
+    'state.events','actions.interruptible','dice.ast'
+}
+_CAPABILITIES={
+    'dnd':{'roll.d20','roll.advantage','inventory.weight','combat.armor_class','combat.saves'},
+    'mystara':{'roll.d20','inventory.weight','combat.armor_class','combat.saves'},
+    'mausritter':{'roll.d20_under','inventory.slot_zones','combat.auto_hit_damage','conditions.slot_pressure'},
+    'forbidden_lands':{'roll.d6_pool','roll.push','resources.year_zero','combat.year_zero'},
+    'the_one_ring':{'roll.feat_die','roll.success_dice','combat.stances','resources.hope','resources.shadow','journey.track'},
+    'gurps':{'roll.3d6_under','combat.active_defense','combat.hit_locations','encumbrance.weight','resources.fp_hp'},
+    'worlds_without_number':{'roll.2d6_skill','roll.d20_attack','combat.shock','inventory.encumbrance'},
+    'stars_without_number':{'roll.2d6_skill','roll.d20_attack','vehicles.starships','inventory.encumbrance'},
+    'cities_without_number':{'roll.2d6_skill','roll.d20_attack','cyberware','inventory.encumbrance'},
+    'ashes_without_number':{'roll.2d6_skill','roll.d20_attack','survival.resources','inventory.encumbrance'},
+    'tales_from_the_loop':{'roll.d6_pool','conditions.drive','combat.condition_driven'},
+    'traveller_2e':{'roll.2d6_target','combat.armor_damage','vehicles.starships','characteristics.damage'},
+}
+
+
 @dataclass(frozen=True)
 class Adapter:
     system_id:str
@@ -25,17 +45,30 @@ class Adapter:
     rules_required:bool=True
     lore_scope:str|None=None
     min_rule_authority:float=0.5
+    capability_set:frozenset[str]=frozenset()
+
     def validate_campaign(self,state):
         if state.system_id!=self.system_id: raise ValueError('adapter_system_mismatch')
         return True
+
+    def supports(self, capability):
+        if not isinstance(capability,str) or not capability:
+            raise ValueError('invalid_capability')
+        return capability in self.capability_set
+
+    def capabilities(self):
+        return tuple(sorted(self.capability_set))
+
     def rules_ready(self,rag,campaign_id):
         if not self.rules_required:return True
         for (c,s,_,_),e in rag._docs.items():
             if c==campaign_id and s==self.system_id and e.kind=='RULE' and not e.secret and e.authority>=self.min_rule_authority:return True
         return False
+
     def mechanics_profile(self):
-        profile=deepcopy(_MECHANICS[self.system_id]); profile.update({'system_id':self.system_id,'family':self.family})
+        profile=deepcopy(_MECHANICS[self.system_id]); profile.update({'system_id':self.system_id,'family':self.family,'capabilities':list(self.capabilities())})
         return profile
+
     def validate_resolution(self,resolution):
         if resolution is None:return None
         if not isinstance(resolution,dict):raise ValueError('invalid_resolution')
@@ -44,14 +77,30 @@ class Adapter:
         family=resolution.get('family')
         if family is not None and family!=self.family:raise ValueError('resolution_family_mismatch')
         out=deepcopy(resolution); out.setdefault('system_id',self.system_id); out.setdefault('family',self.family); return out
+
     def narrator_profile(self,rag,campaign_id):
-        return {'system_id':self.system_id,'family':self.family,'lore_scope':self.lore_scope,'rules_ready':self.rules_ready(rag,campaign_id),'min_rule_authority':self.min_rule_authority,'mechanics':self.mechanics_profile()}
+        return {'system_id':self.system_id,'family':self.family,'lore_scope':self.lore_scope,'rules_ready':self.rules_ready(rag,campaign_id),'min_rule_authority':self.min_rule_authority,'mechanics':self.mechanics_profile(),'capabilities':list(self.capabilities())}
+
 
 class AdapterRegistry:
     def __init__(self):
         families={'dnd':'dnd','mystara':'dnd','mausritter':'mausritter','forbidden_lands':'year_zero','the_one_ring':'the_one_ring','gurps':'gurps','worlds_without_number':'xwn','stars_without_number':'xwn','cities_without_number':'xwn','ashes_without_number':'xwn','tales_from_the_loop':'year_zero','traveller_2e':'traveller'}
-        self._items={k:Adapter(k,families[k],True,'mystara' if k=='mystara' else None) for k in SUPPORTED}
+        self._items={
+            k:Adapter(
+                k,
+                families[k],
+                True,
+                'mystara' if k=='mystara' else None,
+                0.5,
+                frozenset(_COMMON_CAPABILITIES | _CAPABILITIES[k]),
+            ) for k in SUPPORTED
+        }
+
     def get(self,system_id):
         if system_id not in self._items:raise KeyError(system_id)
         return self._items[system_id]
+
+    def supports(self,system_id,capability):
+        return self.get(system_id).supports(capability)
+
     def all(self):return tuple(self._items[k] for k in SUPPORTED)

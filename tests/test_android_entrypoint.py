@@ -38,3 +38,13 @@ def test_android_configure_json_is_positional_and_valid_json(tmp_path):
     assert json.loads(raw)=={'configured':True,'model':None,'rag_persistent':True}
     state=android.new_campaign('c','gurps')
     assert json.loads(state)['system_id']=='gurps'
+
+
+def test_android_defaults_to_offline_safe_when_gemini_key_is_missing(monkeypatch, tmp_path):
+    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
+    status = android.configure(use_gemini=True, api_key=None, rag_db_path=str(tmp_path/'rag.sqlite3'))
+    assert status['configured'] is True and status['model'] is None
+    state = android.new_campaign('offline', 'gurps')
+    out = json.loads(android.turn(state, json.dumps({'text':'Olho ao redor','request_id':'r1'})))
+    assert out['result']['narration_source'] == 'deterministic_fallback'
+    assert out['result']['narration'].strip()

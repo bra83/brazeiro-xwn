@@ -11,7 +11,8 @@ def test_rule_gate_fails_closed():
 def test_rule_evidence_and_scope():
     e=BarbaraEngine(); s=CampaignState("c","gurps")
     e.rag.replace_source("basic",[Evidence("basic","ataque usa regra oficial","RULE","c","gurps")])
-    assert e.turn(s,"ataque regra","1",mechanical=True)["tick"]==1
+    r=e.turn(s,"ataque regra","1",mechanical=True)
+    assert r["phase"]=="WAITING_FOR_ROLL" and r["tick"]==0 and s.tick==0
 
 def test_private_recursive_removed():
     x={"npc":{"name":"A","private_agenda":"trair","nested":{"private":True,"secret":"x"}}}

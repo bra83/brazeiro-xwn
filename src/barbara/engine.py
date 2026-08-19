@@ -12,17 +12,24 @@ from .grounding import ClaimGrounding
 from .telemetry import Telemetry
 from .adapters import AdapterRegistry
 from .mechanics import MechanicsAuthority
+from .effects import EffectResolver
+from .action_state import ActionStateMachine
+from .context import ContextEngine
 
 class BarbaraEngine:
     MAX_NARRATION=20000
     MAX_REQUEST_LOG=1000
     _RETRIEVAL_HINTS={'combat':'combat attack ataque ataco golpe strike fight damage dano defense defesa','travel':'travel journey viagem viajo road estrada trail trilha movement movimento','investigation':'investigation investigate investigação exam examine examino search procura clue pista perception percepção','dialogue':'dialogue social conversa persuasion persuasão reaction reação influence influência','action':'action ação check teste skill perícia ability habilidade','meta':'rule regra rules regras mechanics mecânica'}
-    def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None,rag=None,rag_db_path=None,embedder=None,telemetry=None,adapters=None,mechanics=None):
+    def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None,rag=None,rag_db_path=None,embedder=None,telemetry=None,adapters=None,mechanics=None,effects=None,action_state=None,context_engine=None):
         if rag is not None and rag_db_path is not None:raise ValueError('rag_configuration_conflict')
-        self.provider=provider; self.rag=rag if rag is not None else RAG(rag_db_path); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self.adapters=adapters or AdapterRegistry(); self.mechanics=mechanics or MechanicsAuthority(); self._request_bindings={}
+        self.provider=provider; self.rag=rag if rag is not None else RAG(rag_db_path); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self.adapters=adapters or AdapterRegistry(); self.mechanics=mechanics or MechanicsAuthority(); self.effects=effects or EffectResolver(); self.action_state=action_state or ActionStateMachine(); self.context_engine=context_engine or ContextEngine(); self._request_bindings={}
     def _fingerprint(self,state,text,mechanical,importance,resolution):return [state.campaign_id,state.system_id,text,mechanical,importance,deepcopy(resolution)]
     def _validate_request_id(self,request_id):
         if not isinstance(request_id,str) or not request_id or len(request_id)>160:raise ValueError('invalid_request_id')
+    def _validate_expected_state_version(self,state,expected_state_version):
+        if expected_state_version is None:return
+        if not isinstance(expected_state_version,int) or isinstance(expected_state_version,bool) or expected_state_version<0:raise ValueError('invalid_expected_state_version')
+        if expected_state_version!=state.state_version:raise ValueError('state_version_conflict')
     def _binding_key(self,state,request_id):return (state.campaign_id,request_id)
     def _check_binding(self,state,request_id,fingerprint):
         entry=self._request_bindings.get(self._binding_key(state,request_id))
@@ -68,8 +75,8 @@ class BarbaraEngine:
         state.discovery['campaign_started']=True; locations=state.discovery.setdefault('locations',{})
         locations[state.location]={'last_seen_tick':state.tick,'imprint':self._world_imprint(state)}
     def narrator_context(self,state,evidence,text='',importance='normal',turn_plan=None,resolution=None):
-        safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]; qcount=self.narrative.question_count(text); world=self._public_world_context(state); memories=self.memory.compact_context(state,query=text,location=state.location); occasion=(turn_plan or {}).get('story_obligation','continuation')
-        return public_view({'location':state.location,'facts':state.facts,'memory':memories,'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'site':world['site'],'public_ledger':world['ledger'],'world_state_for_dramatization':{'weather':state.weather,'economy':state.economy},'world_experience':{'occasion':occasion,'player_has_preexisting_local_knowledge':occasion not in {'campaign_opening','first_arrival'},'instruction':'Transform current world state into perceivable fiction. Do not report hidden/global state as a briefing.'},'evidence':safe,'resolution':deepcopy(resolution),'system_profile':self._system_profile(state),'narrative_policy':self.narrative.narrator_directives(importance,qcount,turn_plan)})
+        safe=[{'source_id':e.source_id,'kind':e.kind,'text':e.text,'checksum':e.checksum} for e in evidence if not e.secret]; qcount=self.narrative.question_count(text); world=self._public_world_context(state); memories=self.memory.compact_context(state,query=text,location=state.location); occasion=(turn_plan or {}).get('story_obligation','continuation'); scene_context=self.context_engine.build(state)
+        return public_view({'location':state.location,'scene_context':scene_context,'facts':state.facts,'memory':memories,'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'site':world['site'],'public_ledger':world['ledger'],'world_state_for_dramatization':{'weather':state.weather,'economy':state.economy},'world_experience':{'occasion':occasion,'player_has_preexisting_local_knowledge':occasion not in {'campaign_opening','first_arrival'},'instruction':'Transform current world state into perceivable fiction. Geography in scene_context is canonical. Never add terrain, water, landmarks or spatial facts that are absent or contradicted there.'},'evidence':safe,'resolution':deepcopy(resolution),'system_profile':self._system_profile(state),'narrative_policy':self.narrative.narrator_directives(importance,qcount,turn_plan)})
     def _validate_provider_output(self,out,state,evidence,context,user_text,importance='normal',plan=None,resolution=None):
         legacy_string=isinstance(out,str); legacy_opt_out=bool(legacy_string and getattr(self.provider,'legacy_text',False))
         if legacy_string:out={'narration':out,'claims':[]}
@@ -93,7 +100,39 @@ class BarbaraEngine:
             else:
                 others=[rid for rid in state.request_log if rid!=request_id]
                 if others:state.request_log.pop(min(others,key=lambda rid:(int(state.request_log[rid].get('result',{}).get('tick',0)),rid)),None)
-    def turn(self,state,text,request_id,mechanical=False,importance='normal',resolution=None):
+    def _append_turn_event(self,state,request_id,state_version,text,plan,resolution):
+        payload={'mode':plan['mode'],'world_advanced':bool(plan['world_advances']),'text':text}
+        if isinstance(resolution,dict):
+            payload['outcome']=resolution.get('outcome'); payload['resolution_id']=resolution.get('resolution_id')
+        event={'event_id':f'{request_id}:turn','type':'turn_committed','request_id':request_id,'tick':state.tick,'state_version':state_version,'payload':payload}
+        state.event_log.append(event); return event['event_id']
+    def _append_wait_event(self,state,request_id,state_version,pending):
+        event={'event_id':f'{request_id}:wait','type':'action_waiting','request_id':request_id,'tick':state.tick,'state_version':state_version,'payload':{'action_id':pending['action_id'],'phase':pending['phase']}}
+        state.event_log.append(event); return event['event_id']
+    def _commit_draft(self,state,draft):
+        draft.validate(); state.__dict__.clear(); state.__dict__.update(deepcopy(draft.__dict__)); state.validate()
+    def _waiting_phase(self,requirement):
+        return {
+            'roll_required':'WAITING_FOR_ROLL',
+            'choice_required':'WAITING_FOR_CHOICE',
+            'reaction_required':'WAITING_FOR_REACTION',
+            'opposed_roll':'WAITING_FOR_OPPOSED_ROLL',
+        }.get(requirement)
+    def _wait_for_requirement(self,state,draft,text,request_id,importance,plan,evidence,profile,fingerprint,requirement='roll_required',requirement_envelope=None):
+        phase=self._waiting_phase(requirement)
+        if phase is None:raise ValueError('invalid_wait_requirement')
+        next_version=state.state_version+1; draft.state_version=next_version
+        pending=self.action_state.begin_wait(draft,request_id,phase,{'text':text,'importance':importance,'mechanical':True,'system_id':state.system_id,'turn_plan':deepcopy(plan),'evidence':[e.checksum for e in evidence],'requirement':requirement,'requirement_envelope':deepcopy(requirement_envelope)})
+        event_id=self._append_wait_event(draft,request_id,next_version,pending)
+        context=self.narrator_context(draft,evidence,text,importance,plan,requirement_envelope)
+        result={'tick':draft.tick,'state_version':next_version,'evidence':[e.checksum for e in evidence],'text':text,'mode':plan['mode'],'world_advanced':False,'importance':importance,'system_profile':profile,'turn_plan':deepcopy(plan),'presentation':deepcopy(plan['channels']),'resolution':deepcopy(requirement_envelope),'requirement':requirement,'effects_applied':[],'event_ids':[event_id],'phase':phase,'pending_action':deepcopy(pending)}
+        if self.provider:
+            provider_state=draft.snapshot(); raw=self.recovery.run(lambda:self.provider.generate(text,context,provider_state)); validated=self._validate_provider_output(raw,draft,evidence,context,text,importance,plan,requirement_envelope); result.update(validated)
+        self._remember_request(draft,request_id,fingerprint,result); draft.validate(); self._commit_draft(state,draft); self._bind_request(state,request_id,fingerprint,result); self.telemetry.record('turn','waiting',campaign=state.campaign_id,system=state.system_id,mode=plan['mode'],phase=phase); return deepcopy(result)
+
+    def _wait_for_resolution(self,state,draft,text,request_id,importance,plan,evidence,profile,fingerprint):
+        return self._wait_for_requirement(state,draft,text,request_id,importance,plan,evidence,profile,fingerprint,'roll_required',None)
+    def turn(self,state,text,request_id,mechanical=False,importance='normal',resolution=None,expected_state_version=None):
         self._validate_request_id(request_id); state.validate(); adapter=self._adapter(state); base_plan=self.narrative.turn_plan(text,mechanical,importance); inferred=self.mechanics.requires_rule(text,mechanical,base_plan); effective_mechanical=bool(mechanical or (inferred and base_plan['mode']=='fiction')); plan=self.narrative.turn_plan(text,effective_mechanical,importance); plan=self.narrative.apply_story_obligation(plan,self._story_occasion(state,plan)); trusted_resolution=adapter.validate_resolution(self.mechanics.validate_resolution(resolution)); profile=adapter.narrator_profile(self.rag,state.campaign_id); fingerprint=self._fingerprint(state,text,effective_mechanical,importance,trusted_resolution)
         bound=self._check_binding(state,request_id,fingerprint)
         if bound is not None:self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id); return bound
@@ -101,14 +140,37 @@ class BarbaraEngine:
             entry=state.request_log[request_id]
             if entry['fingerprint']!=fingerprint:raise ValueError('request_id_collision')
             self._bind_request(state,request_id,fingerprint,entry['result']); self.telemetry.record('turn','idempotent',campaign=state.campaign_id,system=state.system_id); return deepcopy(entry['result'])
-        before=state.snapshot()
+        self._validate_expected_state_version(state,expected_state_version)
+        if state.pending_action:raise ValueError('pending_action_must_be_resumed')
         try:
             gate_required=bool(effective_mechanical or (self.provider is not None and inferred and plan['mode']=='meta')); retrieval_query=self._retrieval_query(text,plan,gate_required); query_vector=self._query_vector(retrieval_query); evidence=self.rag.retrieve(retrieval_query,state.campaign_id,state.system_id,kinds={'RULE','LORE','MEMORY'},allow_secret=False,query_vector=query_vector); self.rules.require(gate_required,evidence)
-            if plan['world_advances']:self.world.advance(state)
-            context=self.narrator_context(state,evidence,text,importance,plan,trusted_resolution); result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':plan['mode'],'world_advanced':plan['world_advances'],'importance':importance,'system_profile':profile,'turn_plan':deepcopy(plan),'presentation':deepcopy(plan['channels']),'resolution':deepcopy(trusted_resolution)}
+            draft=state.snapshot()
+            unresolved_requirement=trusted_resolution.get('requirement') if isinstance(trusted_resolution,dict) else None
+            if self._waiting_phase(unresolved_requirement):
+                return self._wait_for_requirement(state,draft,text,request_id,importance,plan,evidence,profile,fingerprint,unresolved_requirement,trusted_resolution)
+            if plan['check_required'] and trusted_resolution is None:
+                return self._wait_for_resolution(state,draft,text,request_id,importance,plan,evidence,profile,fingerprint)
+            next_version=state.state_version+1; event_ids=[]
+            if plan['world_advances']:self.world.advance(draft)
+            resolution_effects=trusted_resolution.get('effects',[]) if isinstance(trusted_resolution,dict) else []
+            applied_effects=self.effects.apply(draft,resolution_effects,request_id,next_version)
+            event_ids.extend(e['event_id'] for e in draft.event_log if e.get('request_id')==request_id)
+            self._mark_discovery(draft,plan); draft.state_version=next_version; event_ids.append(self._append_turn_event(draft,request_id,next_version,text,plan,trusted_resolution)); draft.validate()
+            context=self.narrator_context(draft,evidence,text,importance,plan,trusted_resolution); result={'tick':draft.tick,'state_version':next_version,'evidence':[e.checksum for e in evidence],'text':text,'mode':plan['mode'],'world_advanced':plan['world_advances'],'importance':importance,'system_profile':profile,'turn_plan':deepcopy(plan),'presentation':deepcopy(plan['channels']),'resolution':deepcopy(trusted_resolution),'effects_applied':deepcopy(applied_effects),'event_ids':event_ids,'phase':'COMPLETED'}
             if self.provider:
-                raw=self.recovery.run(lambda:self.provider.generate(text,context,state)); validated=self._validate_provider_output(raw,state,evidence,context,text,importance,plan,trusted_resolution); result.update(validated)
-            self._mark_discovery(state,plan); self._remember_request(state,request_id,fingerprint,result); state.validate(); self._bind_request(state,request_id,fingerprint,result)
+                provider_state=draft.snapshot(); raw=self.recovery.run(lambda:self.provider.generate(text,context,provider_state)); validated=self._validate_provider_output(raw,draft,evidence,context,text,importance,plan,trusted_resolution); result.update(validated)
+            self._remember_request(draft,request_id,fingerprint,result); draft.validate(); self._commit_draft(state,draft); self._bind_request(state,request_id,fingerprint,result)
         except Exception as exc:
-            state.__dict__.clear(); state.__dict__.update(before.__dict__); self.telemetry.record('reject',self._error_code(exc),campaign=state.campaign_id,system=state.system_id); raise
+            self.telemetry.record('reject',self._error_code(exc),campaign=state.campaign_id,system=state.system_id); raise
         self.telemetry.record('turn','ok',campaign=state.campaign_id,system=state.system_id,mode=result['mode']); return deepcopy(result)
+    def resume_action(self,state,action_id,request_id,resolution,expected_state_version=None):
+        self._validate_request_id(request_id); state.validate(); self._validate_expected_state_version(state,expected_state_version)
+        if request_id in state.request_log:
+            saved=state.request_log[request_id]['result']
+            if saved.get('resolution')!=resolution:raise ValueError('request_id_collision')
+            return deepcopy(saved)
+        pending=self.action_state.resume(state,action_id); payload=deepcopy(pending['payload'])
+        if payload.get('system_id')!=state.system_id:raise ValueError('pending_system_mismatch')
+        draft=state.snapshot(); self.action_state.clear(draft,action_id)
+        result=self.turn(draft,payload['text'],request_id,mechanical=True,importance=payload.get('importance','normal'),resolution=deepcopy(resolution),expected_state_version=state.state_version)
+        result['resumed_action_id']=action_id; result['phase']='COMPLETED'; self._commit_draft(state,draft); return deepcopy(result)

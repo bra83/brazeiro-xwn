@@ -28,7 +28,8 @@ def test_release_rag_is_persistent_scoped_and_rule_gate_is_fail_closed():
         e = BarbaraEngine(rag=RAG(db))
         good = CampaignState('camp','gurps')
         result = e.turn(good,'Faço um teste de ataque','r1')
-        assert result['turn_plan']['check_required'] is True and good.tick == 1
+        assert result['turn_plan']['check_required'] is True
+        assert result['phase'] == 'WAITING_FOR_ROLL' and good.tick == 0
         wrong_campaign = CampaignState('other','gurps')
         try:
             e.turn(wrong_campaign,'Faço um teste de ataque','r2')

@@ -35,3 +35,13 @@ def test_prompt_marks_evidence_as_data(monkeypatch):
 def test_invalid_response_fails_closed(monkeypatch):
     monkeypatch.setattr(g.urllib.request,'urlopen',lambda req,timeout:Resp({'candidates':[]}))
     with pytest.raises(ValueError): GeminiProvider(api_key='x').generate('look',{},None)
+
+def test_prompt_binds_narration_to_canonical_atlas_and_scene_depth(monkeypatch):
+    seen={}
+    payload={'candidates':[{'content':{'parts':[{'text':'{"narration":"ok","claims":[]}'}]}}]}
+    def fake(req,timeout):
+        body=json.loads(req.data.decode()); seen['text']=body['contents'][0]['parts'][0]['text']; return Resp(payload)
+    monkeypatch.setattr(g.urllib.request,'urlopen',fake)
+    GeminiProvider(api_key='x').generate('look',{'scene_context':{'terrain':'deserto','water_present':False}},None)
+    assert 'scene_context is canonical atlas/geography state' in seen['text']
+    assert 'at least two substantive paragraphs' in seen['text']

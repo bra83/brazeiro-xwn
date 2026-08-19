@@ -6,6 +6,7 @@ need to know Barbara's internal classes, which lets the motor evolve independent
 from __future__ import annotations
 
 import json
+import os
 from threading import RLock
 from .bridge import HostBridge
 from .engine import BarbaraEngine
@@ -28,10 +29,12 @@ def configure(*, api_key=None, model='gemini-3.5-flash-lite', rag_db_path=None, 
     cfg = (api_key, model, rag_db_path, use_gemini)
     with _lock:
         if _bridge is None or _config != cfg:
-            provider = GeminiProvider(api_key=api_key, model=model) if use_gemini else None
+            resolved_key = api_key or os.getenv('GEMINI_API_KEY')
+            provider = GeminiProvider(api_key=resolved_key, model=model) if (use_gemini and resolved_key) else None
             _bridge = HostBridge(BarbaraEngine(provider=provider, rag_db_path=rag_db_path))
             _config = cfg
-    return {'configured': True, 'model': model if use_gemini else None, 'rag_persistent': rag_db_path is not None}
+    active_model = model if (use_gemini and (api_key or os.getenv('GEMINI_API_KEY'))) else None
+    return {'configured': True, 'model': active_model, 'rag_persistent': rag_db_path is not None}
 
 
 def configure_json(api_key=None, model='gemini-3.5-flash-lite', rag_db_path=None, use_gemini=True):
