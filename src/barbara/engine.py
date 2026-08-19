@@ -15,14 +15,16 @@ from .mechanics import MechanicsAuthority
 from .effects import EffectResolver
 from .action_state import ActionStateMachine
 from .context import ContextEngine
+from .disclosure import LoreDisclosureGate, ContinuityGate
+from .systems import SystemModuleRegistry
 
 class BarbaraEngine:
     MAX_NARRATION=20000
     MAX_REQUEST_LOG=1000
     _RETRIEVAL_HINTS={'combat':'combat attack ataque ataco golpe strike fight damage dano defense defesa','travel':'travel journey viagem viajo road estrada trail trilha movement movimento','investigation':'investigation investigate investigação exam examine examino search procura clue pista perception percepção','dialogue':'dialogue social conversa persuasion persuasão reaction reação influence influência','action':'action ação check teste skill perícia ability habilidade','meta':'rule regra rules regras mechanics mecânica'}
-    def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None,rag=None,rag_db_path=None,embedder=None,telemetry=None,adapters=None,mechanics=None,effects=None,action_state=None,context_engine=None):
+    def __init__(self,provider=None,recovery=None,narrative=None,knowledge=None,grounding=None,rag=None,rag_db_path=None,embedder=None,telemetry=None,adapters=None,mechanics=None,effects=None,action_state=None,context_engine=None,disclosure=None,continuity=None,systems=None):
         if rag is not None and rag_db_path is not None:raise ValueError('rag_configuration_conflict')
-        self.provider=provider; self.rag=rag if rag is not None else RAG(rag_db_path); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self.adapters=adapters or AdapterRegistry(); self.mechanics=mechanics or MechanicsAuthority(); self.effects=effects or EffectResolver(); self.action_state=action_state or ActionStateMachine(); self.context_engine=context_engine or ContextEngine(); self._request_bindings={}
+        self.provider=provider; self.rag=rag if rag is not None else RAG(rag_db_path); self.rules=RuleGate(); self.world=WorldTick(); self.memory=Memory(); self.recovery=recovery or RecoveryPolicy(); self.narrative=narrative or NarrativePolicy(); self.knowledge=knowledge or KnowledgeBoundary(); self.grounding=grounding or ClaimGrounding(); self.embedder=embedder; self.telemetry=telemetry or Telemetry(); self.adapters=adapters or AdapterRegistry(); self.mechanics=mechanics or MechanicsAuthority(); self.effects=effects or EffectResolver(); self.action_state=action_state or ActionStateMachine(); self.context_engine=context_engine or ContextEngine(); self.disclosure=disclosure or LoreDisclosureGate(); self.continuity=continuity or ContinuityGate(); self.systems=systems or SystemModuleRegistry(self.adapters); self._request_bindings={}
     def _fingerprint(self,state,text,mechanical,importance,resolution):return [state.campaign_id,state.system_id,text,mechanical,importance,deepcopy(resolution)]
     def _validate_request_id(self,request_id):
         if not isinstance(request_id,str) or not request_id or len(request_id)>160:raise ValueError('invalid_request_id')
@@ -56,7 +58,8 @@ class BarbaraEngine:
         try:adapter=self.adapters.get(state.system_id)
         except KeyError as exc:raise ValueError(f'unsupported_system:{state.system_id}') from exc
         adapter.validate_campaign(state); return adapter
-    def _system_profile(self,state):return self._adapter(state).narrator_profile(self.rag,state.campaign_id)
+    def _system_profile(self,state):
+        profile=self._adapter(state).narrator_profile(self.rag,state.campaign_id); profile['module']=self.systems.get(state.system_id).describe(); return profile
     def _public_world_context(self,state):
         site=deepcopy(state.sites.get(state.location,{})) if state.location else {}; ledger=[deepcopy(e) for e in state.public_ledger[-20:] if isinstance(e,dict) and (e.get('origin') in {None,state.location} or state.location=='')]; return {'site':public_view(site),'ledger':public_view(ledger)}
     def _world_imprint(self,state):
@@ -91,6 +94,7 @@ class BarbaraEngine:
             self.narrative.validate_response_coverage(user_text,narration); self.narrative.validate_scene_ending(narration,importance)
             if getattr(self.provider,'enforce_story_contract',False):self.narrative.validate_story_obligation(narration,(plan or {}).get('story_obligation','continuation'))
         claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state),public_context=context)
+        self.continuity.validate(narration,claims,state,resolution)
         return {'narration':narration,'claims':deepcopy(claims)}
     def _remember_request(self,state,request_id,fingerprint,result):
         state.request_log[request_id]={'fingerprint':deepcopy(fingerprint),'result':deepcopy(result)}
@@ -112,12 +116,7 @@ class BarbaraEngine:
     def _commit_draft(self,state,draft):
         draft.validate(); state.__dict__.clear(); state.__dict__.update(deepcopy(draft.__dict__)); state.validate()
     def _waiting_phase(self,requirement):
-        return {
-            'roll_required':'WAITING_FOR_ROLL',
-            'choice_required':'WAITING_FOR_CHOICE',
-            'reaction_required':'WAITING_FOR_REACTION',
-            'opposed_roll':'WAITING_FOR_OPPOSED_ROLL',
-        }.get(requirement)
+        return {'roll_required':'WAITING_FOR_ROLL','choice_required':'WAITING_FOR_CHOICE','reaction_required':'WAITING_FOR_REACTION','opposed_roll':'WAITING_FOR_OPPOSED_ROLL'}.get(requirement)
     def _wait_for_requirement(self,state,draft,text,request_id,importance,plan,evidence,profile,fingerprint,requirement='roll_required',requirement_envelope=None):
         phase=self._waiting_phase(requirement)
         if phase is None:raise ValueError('invalid_wait_requirement')
@@ -129,7 +128,6 @@ class BarbaraEngine:
         if self.provider:
             provider_state=draft.snapshot(); raw=self.recovery.run(lambda:self.provider.generate(text,context,provider_state)); validated=self._validate_provider_output(raw,draft,evidence,context,text,importance,plan,requirement_envelope); result.update(validated)
         self._remember_request(draft,request_id,fingerprint,result); draft.validate(); self._commit_draft(state,draft); self._bind_request(state,request_id,fingerprint,result); self.telemetry.record('turn','waiting',campaign=state.campaign_id,system=state.system_id,mode=plan['mode'],phase=phase); return deepcopy(result)
-
     def _wait_for_resolution(self,state,draft,text,request_id,importance,plan,evidence,profile,fingerprint):
         return self._wait_for_requirement(state,draft,text,request_id,importance,plan,evidence,profile,fingerprint,'roll_required',None)
     def turn(self,state,text,request_id,mechanical=False,importance='normal',resolution=None,expected_state_version=None):
@@ -143,13 +141,10 @@ class BarbaraEngine:
         self._validate_expected_state_version(state,expected_state_version)
         if state.pending_action:raise ValueError('pending_action_must_be_resumed')
         try:
-            gate_required=bool(effective_mechanical or (self.provider is not None and inferred and plan['mode']=='meta')); retrieval_query=self._retrieval_query(text,plan,gate_required); query_vector=self._query_vector(retrieval_query); evidence=self.rag.retrieve(retrieval_query,state.campaign_id,state.system_id,kinds={'RULE','LORE','MEMORY'},allow_secret=False,query_vector=query_vector); self.rules.require(gate_required,evidence)
-            draft=state.snapshot()
-            unresolved_requirement=trusted_resolution.get('requirement') if isinstance(trusted_resolution,dict) else None
-            if self._waiting_phase(unresolved_requirement):
-                return self._wait_for_requirement(state,draft,text,request_id,importance,plan,evidence,profile,fingerprint,unresolved_requirement,trusted_resolution)
-            if plan['check_required'] and trusted_resolution is None:
-                return self._wait_for_resolution(state,draft,text,request_id,importance,plan,evidence,profile,fingerprint)
+            gate_required=bool(effective_mechanical or (self.provider is not None and inferred and plan['mode']=='meta')); retrieval_query=self._retrieval_query(text,plan,gate_required); query_vector=self._query_vector(retrieval_query); evidence=self.rag.retrieve(retrieval_query,state.campaign_id,state.system_id,kinds={'RULE','LORE','MEMORY'},allow_secret=False,query_vector=query_vector); evidence=self.disclosure.allowed_evidence(state,evidence); self.rules.require(gate_required,evidence)
+            draft=state.snapshot(); unresolved_requirement=trusted_resolution.get('requirement') if isinstance(trusted_resolution,dict) else None
+            if self._waiting_phase(unresolved_requirement): return self._wait_for_requirement(state,draft,text,request_id,importance,plan,evidence,profile,fingerprint,unresolved_requirement,trusted_resolution)
+            if plan['check_required'] and trusted_resolution is None: return self._wait_for_resolution(state,draft,text,request_id,importance,plan,evidence,profile,fingerprint)
             next_version=state.state_version+1; event_ids=[]
             if plan['world_advances']:self.world.advance(draft)
             resolution_effects=trusted_resolution.get('effects',[]) if isinstance(trusted_resolution,dict) else []
