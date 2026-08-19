@@ -7,7 +7,6 @@ class CampaignState:
     campaign_id:str
     system_id:str
     tick:int=0
-    state_version:int=0
     location:str=''
     facts:dict=field(default_factory=dict)
     world_flags:dict=field(default_factory=dict)
@@ -15,7 +14,6 @@ class CampaignState:
     factions:dict=field(default_factory=dict)
     rumors:list=field(default_factory=list)
     events:list=field(default_factory=list)
-    event_log:list=field(default_factory=list)
     memory:list=field(default_factory=list)
     clocks:dict=field(default_factory=dict)
     economy:dict=field(default_factory=dict)
@@ -28,6 +26,8 @@ class CampaignState:
     secret_ledger:list=field(default_factory=list)
     request_log:dict=field(default_factory=dict)
     discovery:dict=field(default_factory=dict)
+    state_version:int=0
+    event_log:list=field(default_factory=list)
     def snapshot(self): return deepcopy(self)
     def validate(self):
         if not isinstance(self.campaign_id,str) or not self.campaign_id: raise ValueError('invalid_campaign_id')
