@@ -69,7 +69,8 @@ def test_mechanical_turn_still_requires_canonical_rule_before_world_tick():
     assert s.tick==0
     add_rule(e)
     r=e.turn(s,'Eu ataco o guarda','r2',mechanical=True)
-    assert r['turn_plan']['check_required'] and s.tick==1
+    assert r['turn_plan']['check_required']
+    assert r['phase']=='WAITING_FOR_ROLL' and s.tick==0
 
 def test_intent_aware_retrieval_does_not_authorize_unrelated_rule():
     e=BarbaraEngine(); s=CampaignState('c','gurps')
