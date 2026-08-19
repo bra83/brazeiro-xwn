@@ -14,6 +14,10 @@ Núcleo desacoplado de Mestre IA para RPG, projetado para substituir o fluxo tra
 - replay determinístico, telemetria de regressão e homologação integrada de campanha longa.
 - 12 adapters: D&D, Mystara, Mausritter, Forbidden Lands, O Um Anel, GURPS, Worlds/Stars/Cities/Ashes Without Number, Tales from the Loop e Traveller 2e.
 
-A matriz de fechamento da versão está em `docs/RELEASE_1_0_ACCEPTANCE.md`. A CI deve manter verdes a suíte completa, a construção da wheel e o smoke test em instalação limpa. A homologação Gemini live usa `gemini-3.5-flash-lite` e depende de credencial/cota externa.
+## Artefato instalável
+
+Cada execução verde da CI constrói, instala em ambiente virtual limpo e só então publica o artifact **`motor-barbara-1.0.0`**, contendo a wheel instalável e a documentação de aceitação/release. Isso permite baixar a versão homologada diretamente pelo GitHub Actions sem depender do checkout do repositório.
+
+A matriz de fechamento da versão está em `docs/RELEASE_1_0_ACCEPTANCE.md` e as notas em `docs/RELEASE_NOTES_1.0.md`. A CI deve manter verdes a suíte completa, a construção da wheel e o smoke test em instalação limpa. A homologação Gemini live usa `gemini-3.5-flash-lite` e depende de credencial/cota externa.
 
 > O branch `backup-xwn-pre-barbara` preserva o conteúdo XWN anterior ao corte.
