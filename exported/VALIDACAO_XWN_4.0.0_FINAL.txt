@@ -1,0 +1,15 @@
+BRASEIRO XWN 4.0.0 — FINAL RELEASE GATE
+Source: 2e2cf82d6dd4e2c2ab84872826939fe823dc1129
+Actions run: 32218854033
+
+PASS 96 assertions — BRASEIRO XWN WWN 3.0.1
+XWN 3.7 quick-rule boundaries OK: moral, ataque, acertar/AC
+XWN4 runtime audit OK: 20089 checks
+XWN4 static parity audit OK: 289 checks, 44 WWN visual variants
+XWN4 browser smoke OK
+
+WWN RULES READY — WWN SRD 1.0
+SWN RULES READY — Stars Without Number Revised
+CWN FAIL-CLOSED — corpus RULE principal não homologado
+AWN FAIL-CLOSED — corpus RULE principal não homologado
+Barbara 1.0.0 @ a31fdb9f9e361fc81b6a5f25c7646450311d0ce3
