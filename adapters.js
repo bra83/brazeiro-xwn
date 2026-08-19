@@ -11,6 +11,7 @@
     AWN:{name:'Abrigo de Partida',kind:'settlement',icon:'⌂',summary:'Um ponto seguro relativo na borda de um ermo ainda pouco conhecido.'},
     CWN:{name:'Distrito Zero',kind:'district',icon:'▦',summary:'Um distrito urbano conhecido apenas pelo que a campanha já confirmou.'}
   });
+  const PRESENTATION=Object.freeze({SWN:{terrain:'space',tile:'assets/domain/space.svg'},AWN:{terrain:'wasteland',tile:'assets/domain/wasteland.svg'},CWN:{terrain:'urban',tile:'assets/domain/urban.svg'}});
   const OWNERS=Object.freeze({
     WWN:new Set(['mara','del','selka','arven','nera','torren','vey','salt','bell','ash','reed','crown']),
     SWN:new Set(['ira','sen','vex','consorcio','livres','arquivo']),
@@ -24,6 +25,7 @@
   function generateDomainHexes(systemId,radius=4){
     const sys=normalize(systemId); if(sys==='WWN')return null;
     const labels=LABELS[sys]||['zona desconhecida'], out={};
+    radius=Math.max(1,Math.min(120,Math.round(Number(radius)||4)));
     for(let q=-radius;q<=radius;q++){
       const r1=Math.max(-radius,-q-radius),r2=Math.min(radius,-q+radius);
       for(let r=r1;r<=r2;r++){
@@ -38,8 +40,8 @@
     const sys=normalize(systemId), out=hexes||{};
     for(const h of Object.values(out)){
       h.notes ||= []; h.sourceSystem=sys;
-      if(sys==='WWN'){ delete h.domainTerrain; delete h.systemLabel; continue; }
-      delete h.terrain; delete h.tile; delete h.road;
+      if(sys==='WWN'){ delete h.domainTerrain; delete h.systemLabel; delete h.presentationTerrain; continue; }
+      delete h.terrain; delete h.tile; delete h.road; delete h.presentationTerrain;
       h.domainTerrain ||= (LABELS[sys]||['zona desconhecida'])[hashString(`${sys}:${h.key}`)%(LABELS[sys]||['zona desconhecida']).length];
       h.systemLabel ||= h.domainTerrain;
       if(h.key!=='0,0' && h.poi && ['settlement','farm','site','ruin','fort','hazard','landmark','water'].includes(h.poi.kind))h.poi=null;
@@ -69,11 +71,17 @@
     const sys=normalize(state?.campaign?.system),errors=[];
     if(state?.rules?.systemId!==sys)errors.push('rules.systemId mismatch');
     if(state?.system?.id!==sys)errors.push('system.id mismatch');
-    if(sys!=='WWN')for(const h of Object.values(state?.hexes||{})){if('terrain'in h||'tile'in h||'road'in h)errors.push(`fantasy field leak ${h.key}`);if(h.sourceSystem!==sys)errors.push(`hex owner mismatch ${h.key}`)}
+    if(sys!=='WWN')for(const h of Object.values(state?.hexes||{})){
+      const p=PRESENTATION[sys];
+      if(h.road)errors.push(`road leak ${h.key}`);
+      if('terrain'in h&&h.terrain!==p.terrain)errors.push(`foreign terrain ${h.key}`);
+      if('tile'in h&&h.tile!==p.tile)errors.push(`foreign tile ${h.key}`);
+      if(h.sourceSystem!==sys)errors.push(`hex owner mismatch ${h.key}`);
+    }
     for(const [id,n] of Object.entries(state?.npcs||{})){const owner=sourceOwner(id);if(owner&&owner!==sys)errors.push(`npc owner leak ${id}`);if(n?.sourceSystem&&n.sourceSystem!==sys)errors.push(`npc source mismatch ${id}`)}
     for(const f of state?.factions||[]){const owner=sourceOwner(f?.id);if(owner&&owner!==sys)errors.push(`faction owner leak ${f.id}`);if(f?.sourceSystem&&f.sourceSystem!==sys)errors.push(`faction source mismatch ${f.id}`)}
     return {ok:errors.length===0,errors};
   }
-  const api={LABELS,STARTS,OWNERS,normalize,sourceOwner,generateDomainHexes,sanitizeHexes,sanitizeEntityMap,sanitizeFactionList,sanitizeRagChunks,validateState};
+  const api={LABELS,STARTS,PRESENTATION,OWNERS,normalize,sourceOwner,generateDomainHexes,sanitizeHexes,sanitizeEntityMap,sanitizeFactionList,sanitizeRagChunks,validateState};
   global.XWN_ADAPTERS=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
