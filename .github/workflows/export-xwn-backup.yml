@@ -1,0 +1,35 @@
+name: Export preserved XWN
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout preserved XWN
+        uses: actions/checkout@v4
+        with:
+          ref: backup-xwn-pre-barbara
+          path: xwn
+      - name: Package preserved tree
+        run: |
+          cd xwn
+          rm -rf .git
+          zip -qr ../Braseiro_XWN_PRESERVED_BACKUP.zip .
+          cd ..
+          sha256sum Braseiro_XWN_PRESERVED_BACKUP.zip > Braseiro_XWN_PRESERVED_BACKUP.sha256
+      - name: Upload source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xwn-preserved-backup
+          path: |
+            Braseiro_XWN_PRESERVED_BACKUP.zip
+            Braseiro_XWN_PRESERVED_BACKUP.sha256
+          if-no-files-found: error
+          retention-days: 7
