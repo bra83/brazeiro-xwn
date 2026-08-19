@@ -27,10 +27,16 @@ ok(manifest.get('share_target',{}).get('method')=='POST','share target lost')
 for s in required_scripts+['assets/domain/space.svg','assets/domain/urban.svg','assets/domain/wasteland.svg']:
     ok(("./"+s) in sw,f'service worker missing {s}')
 ok("braseiro-xwn-v400-barbara" in sw,'service worker cache not versioned')
-hexes=list((ROOT/'assets'/'hex_full').glob('*.png'))
-ok(len(hexes)>=44,f'WWN hex library regressed: {len(hexes)}')
 lib=text('hex-library.js')
-for p in hexes: ok(p.stem in lib or len(hexes)>44,f'hex asset absent from manifest {p.name}')
+entries=re.findall(r'"id":"([^"]+)"[^\n]*?"file":"([^"]+)"[^\n]*?"width":224,"height":194',lib)
+ok(len(entries)==44,f'WWN visual library must expose 44 variants, got {len(entries)}')
+ok(len({i for i,_ in entries})==44,'duplicate WWN visual ids')
+for ident,rel in entries:
+    p=ROOT/rel
+    ok(p.is_file(),f'WWN visual missing on disk: {rel}')
+    ok(p.suffix.lower() in {'.png','.svg','.webp'},f'unsupported WWN visual format: {rel}')
+    if p.suffix.lower()=='.svg':
+        s=text(rel);ok('width="224"' in s and 'height="194"' in s,f'wrong restored visual dimensions: {rel}')
 systems=text('systems.js')
 ok("WWN:{" in systems and "corpusReady:true" in systems,'WWN rules not ready')
 ok("SWN:{" in systems and systems.count('corpusReady:true')>=2,'SWN rules not ready')
@@ -49,4 +55,4 @@ for feature in ['Exportar ficha JSON','Importar ficha JSON','Salvar snapshot loc
 for bad in ['\x08moral','\x08ataque','\x08acertar']:
     ok(bad not in text('engine.js'),'control-character regex regression returned')
 ok('xwn4-migration.js' in sw,'save migration not cached')
-print(f'XWN4 static parity audit OK: {checks} checks, {len(hexes)} WWN hex assets')
+print(f'XWN4 static parity audit OK: {checks} checks, {len(entries)} WWN visual variants')
