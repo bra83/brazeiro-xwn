@@ -3,6 +3,8 @@ name: Barbara validation
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       live_gemini:
