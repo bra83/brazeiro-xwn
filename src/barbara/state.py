@@ -28,6 +28,7 @@ class CampaignState:
     discovery:dict=field(default_factory=dict)
     state_version:int=0
     event_log:list=field(default_factory=list)
+    pending_action:dict=field(default_factory=dict)
     def snapshot(self): return deepcopy(self)
     def validate(self):
         if not isinstance(self.campaign_id,str) or not self.campaign_id: raise ValueError('invalid_campaign_id')
@@ -35,7 +36,7 @@ class CampaignState:
         if not isinstance(self.tick,int) or isinstance(self.tick,bool) or self.tick<0: raise ValueError('invalid_tick')
         if not isinstance(self.state_version,int) or isinstance(self.state_version,bool) or self.state_version<0: raise ValueError('invalid_state_version')
         if not isinstance(self.location,str): raise ValueError('invalid_location')
-        for name in ('facts','world_flags','npcs','factions','clocks','economy','weather','player_state','scene','notes','sites','request_log','discovery'):
+        for name in ('facts','world_flags','npcs','factions','clocks','economy','weather','player_state','scene','notes','sites','request_log','discovery','pending_action'):
             if not isinstance(getattr(self,name),dict): raise ValueError('invalid_'+name)
         for name in ('rumors','events','event_log','memory','public_ledger','secret_ledger'):
             if not isinstance(getattr(self,name),list): raise ValueError('invalid_'+name)
@@ -45,6 +46,14 @@ class CampaignState:
             if not isinstance(entry.get('type'),str) or not entry['type']: raise ValueError('invalid_event_log_entry')
             if not isinstance(entry.get('request_id'),str) or not entry['request_id']: raise ValueError('invalid_event_log_entry')
             if not isinstance(entry.get('tick'),int) or isinstance(entry['tick'],bool) or entry['tick']<0: raise ValueError('invalid_event_log_entry')
+        if self.pending_action:
+            required={'action_id','request_id','phase','state_version','payload'}
+            if set(self.pending_action)!=required: raise ValueError('invalid_pending_action_fields')
+            if not isinstance(self.pending_action['action_id'],str) or not self.pending_action['action_id']: raise ValueError('invalid_pending_action_id')
+            if not isinstance(self.pending_action['request_id'],str) or not self.pending_action['request_id']: raise ValueError('invalid_pending_request_id')
+            if self.pending_action['phase'] not in {'IDLE','INTERPRETING','RESOLVING','WAITING_FOR_ROLL','WAITING_FOR_CHOICE','WAITING_FOR_REACTION','WAITING_FOR_OPPOSED_ROLL','COMMITTING','NARRATING','COMPLETED','CANCELLED'}: raise ValueError('invalid_pending_phase')
+            if not isinstance(self.pending_action['state_version'],int) or isinstance(self.pending_action['state_version'],bool) or self.pending_action['state_version']<0: raise ValueError('invalid_pending_state_version')
+            if not isinstance(self.pending_action['payload'],dict): raise ValueError('invalid_pending_payload')
         if 'campaign_started' in self.discovery and not isinstance(self.discovery['campaign_started'],bool): raise ValueError('invalid_discovery_campaign_started')
         if 'locations' in self.discovery and not isinstance(self.discovery['locations'],dict): raise ValueError('invalid_discovery_locations')
         for rid,entry in self.request_log.items():
