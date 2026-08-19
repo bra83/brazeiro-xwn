@@ -24,16 +24,21 @@ class CampaignState:
     sites:dict=field(default_factory=dict)
     public_ledger:list=field(default_factory=list)
     secret_ledger:list=field(default_factory=list)
+    request_log:dict=field(default_factory=dict)
     def snapshot(self): return deepcopy(self)
     def validate(self):
         if not isinstance(self.campaign_id,str) or not self.campaign_id: raise ValueError('invalid_campaign_id')
         if not isinstance(self.system_id,str) or not self.system_id: raise ValueError('invalid_system_id')
         if not isinstance(self.tick,int) or isinstance(self.tick,bool) or self.tick<0: raise ValueError('invalid_tick')
         if not isinstance(self.location,str): raise ValueError('invalid_location')
-        for name in ('facts','world_flags','npcs','factions','clocks','economy','weather','player_state','scene','notes','sites'):
+        for name in ('facts','world_flags','npcs','factions','clocks','economy','weather','player_state','scene','notes','sites','request_log'):
             if not isinstance(getattr(self,name),dict): raise ValueError('invalid_'+name)
         for name in ('rumors','events','memory','public_ledger','secret_ledger'):
             if not isinstance(getattr(self,name),list): raise ValueError('invalid_'+name)
+        for rid,entry in self.request_log.items():
+            if not isinstance(rid,str) or not rid or len(rid)>160: raise ValueError('invalid_request_id')
+            if not isinstance(entry,dict) or set(entry)!={'fingerprint','result'}: raise ValueError('invalid_request_log_entry')
+            if not isinstance(entry['fingerprint'],list) or not isinstance(entry['result'],dict): raise ValueError('invalid_request_log_entry')
         return True
     def to_dict(self): self.validate(); return deepcopy(asdict(self))
     def to_json(self): return json.dumps(self.to_dict(),ensure_ascii=False,sort_keys=True,separators=(',',':'))
