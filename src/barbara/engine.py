@@ -45,6 +45,7 @@ class BarbaraEngine:
         return public_view({'location':state.location,'facts':state.facts,'memory':memories,'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'site':world['site'],'public_ledger':world['ledger'],'evidence':safe,'system_profile':self._system_profile(state),'narrative_policy':self.narrative.narrator_directives(importance,qcount,turn_plan)})
     def _validate_provider_output(self,out,state,evidence,context,user_text,importance='normal'):
         legacy_string=isinstance(out,str)
+        legacy_opt_out=bool(legacy_string and getattr(self.provider,'legacy_text',False))
         if legacy_string:out={'narration':out,'claims':[],'state_patch':[]}
         if not isinstance(out,dict):raise ValueError('invalid_provider_output')
         if set(out)-{'narration','claims','state_patch'}:raise ValueError('unknown_provider_field')
@@ -52,7 +53,7 @@ class BarbaraEngine:
         if not isinstance(narration,str) or not narration.strip() or len(narration)>self.MAX_NARRATION:raise ValueError('invalid_narration')
         if len(narration)<self.narrative.minimum_acceptable_chars(importance):raise ValueError('narrativa_resumida_demais')
         self.narrative.validate_player_agency(user_text,narration)
-        if not legacy_string:
+        if not legacy_opt_out:
             self.narrative.validate_response_coverage(user_text,narration)
             self.narrative.validate_scene_ending(narration,importance)
         claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state),public_context=context)
