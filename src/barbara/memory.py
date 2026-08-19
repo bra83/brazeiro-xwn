@@ -29,6 +29,16 @@ class Memory:
             scored.append((score,tick,i,m))
         selected=sorted(scored,key=lambda x:(-x[0],-x[1],-x[2]))[:limit]; selected.sort(key=lambda x:(x[1],x[2]))
         return deepcopy([x[3] for x in selected])
+    def canonical_layers(self,state):
+        return {'canonical_facts':deepcopy(state.facts),'campaign_state':{'tick':state.tick,'location':state.location,'player_state':deepcopy(state.player_state)},'event_log':deepcopy(state.event_log),'episodic_memory':deepcopy(state.memory),'npc_memory':{nid:deepcopy(npc.get('memory',[])) for nid,npc in state.npcs.items() if isinstance(npc,dict)},'semantic_memory':deepcopy(state.notes.get('semantic_memory',{})),'knowledge_graph':deepcopy(state.notes.get('knowledge_graph',{})),'summaries':deepcopy(state.notes.get('memory_summaries',{})),'inferences':deepcopy(state.notes.get('inferences',[])),'rumors':deepcopy(state.rumors)}
+    def record_belief(self,state,npc_id,key,value,confidence=0.5):
+        npc=state.npcs.get(npc_id)
+        if not isinstance(npc,dict): raise ValueError('unknown_npc')
+        if not isinstance(confidence,(int,float)) or isinstance(confidence,bool) or not 0<=confidence<=1: raise ValueError('invalid_confidence')
+        beliefs=npc.setdefault('beliefs',{}); beliefs[str(key)]={'value':deepcopy(value),'confidence':float(confidence),'tick':state.tick}; return deepcopy(beliefs[str(key)])
+    def record_inference(self,state,text,evidence_ids=()):
+        if not isinstance(text,str) or not text.strip(): raise ValueError('invalid_inference')
+        bucket=state.notes.setdefault('inferences',[]); entry={'text':text.strip(),'evidence_ids':list(evidence_ids),'tick':state.tick}; bucket.append(entry); return deepcopy(entry)
     def causal_trace(self,state,event_id):
         by={e.get('id'):e for e in state.events if isinstance(e,dict) and e.get('id') is not None}; out=[]; cur=by.get(event_id); seen=set()
         while cur and cur.get('id') not in seen:
