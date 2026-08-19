@@ -43,7 +43,7 @@ class ActionPipeline:
             return operation(), None
         except Exception as exc:
             recovery = getattr(self.engine, 'recovery', None)
-            if not self.failure_policy.is_provider_failure(exc, recovery):
+            if not self.failure_policy.is_fallback_safe(exc, recovery):
                 raise
             return offline_operation(), str(exc).split(':', 1)[0] or exc.__class__.__name__
 
@@ -67,8 +67,9 @@ class ActionPipeline:
         if narration and not reason:
             try:
                 self.consistency.validate(narration, context)
-                self.consistency.validate_paragraphs(
+                self.consistency.validate_depth(
                     narration,
+                    context,
                     mode=result.get('mode', 'fiction'),
                     importance=importance,
                 )
@@ -82,7 +83,7 @@ class ActionPipeline:
             result['narrative_fallback_reason'] = reason or 'provider_missing'
             self.consistency.validate(result['narration'], context)
             if result.get('mode') == 'fiction':
-                self.consistency.validate_paragraphs(result['narration'], mode='fiction', importance='normal')
+                self.consistency.validate_depth(result['narration'], context, mode='fiction', importance='normal')
 
         self._persist_final_result(state, request_id, result)
         return result
