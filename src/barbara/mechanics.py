@@ -13,7 +13,7 @@ class MechanicsAuthority:
     def validate_resolution(self,resolution):
         if resolution is None:return None
         if not isinstance(resolution,dict):raise ValueError('invalid_resolution')
-        allowed={'outcome','roll','total','target','margin','details','source','system_id','family','mechanic'}
+        allowed={'resolution_id','outcome','roll','total','target','margin','details','source','system_id','family','mechanic','effects'}
         if set(resolution)-allowed:raise ValueError('invalid_resolution_field')
         outcome=resolution.get('outcome')
         if outcome not in {'success','failure','critical_success','critical_failure','partial'}:raise ValueError('invalid_resolution_outcome')
@@ -21,9 +21,11 @@ class MechanicsAuthority:
         if source not in {'host','adapter','dice'}:raise ValueError('untrusted_resolution_source')
         for k in ('roll','total','target','margin'):
             if k in resolution and (not isinstance(resolution[k],(int,float)) or isinstance(resolution[k],bool)):raise ValueError('invalid_resolution_number')
-        for k in ('system_id','family','mechanic'):
+        for k in ('resolution_id','system_id','family','mechanic'):
             if k in resolution and (not isinstance(resolution[k],str) or not resolution[k]):raise ValueError('invalid_resolution_binding')
-        out=deepcopy(resolution); out['source']=source; return out
+        effects=resolution.get('effects',[])
+        if not isinstance(effects,list):raise ValueError('invalid_resolution_effects')
+        out=deepcopy(resolution); out['source']=source; out['effects']=deepcopy(effects); return out
     def validate_narration(self,narration,check_required=False,resolution=None):
         if not check_required or resolution is not None:return True
         rendered=str(narration).lower()
