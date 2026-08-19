@@ -22,6 +22,16 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Build source workspace snapshot
+        run: |
+          tar --exclude=.git --exclude=dist --exclude=.pytest_cache --exclude='**/__pycache__' -czf /tmp/barbara-workspace-${GITHUB_SHA}.tar.gz .
+      - name: Publish source workspace snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: barbara-source-${{ github.sha }}
+          path: /tmp/barbara-workspace-${{ github.sha }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
