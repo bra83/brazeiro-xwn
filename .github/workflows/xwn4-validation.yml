@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -48,6 +50,7 @@ jobs:
           {
             echo 'BRASEIRO XWN 4.0.0 — MOTOR BARBARA'
             echo "Commit: $GITHUB_SHA"
+            echo "Actions run: $GITHUB_RUN_ID"
             echo
             cat /tmp/legacy.log
             cat /tmp/xwn4.log
@@ -80,3 +83,21 @@ jobs:
             VALIDACAO_XWN_4.0.0.txt
           if-no-files-found: error
           retention-days: 30
+      - name: Publish green gate metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s\n' "$GITHUB_RUN_ID" > /tmp/run_id.txt
+          printf '%s\n' "$GITHUB_SHA" > /tmp/source_commit.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout --orphan xwn4-export-work
+          git rm -rf . >/dev/null 2>&1 || true
+          mkdir -p exported
+          cp /tmp/run_id.txt exported/run_id.txt
+          cp /tmp/source_commit.txt exported/source_commit.txt
+          cp VALIDACAO_XWN_4.0.0.txt exported/
+          cp Braseiro_XWN_4.0.0_MOTOR_BARBARA.sha256 exported/
+          git add exported
+          git commit -m 'export: XWN 4 green validation gate [skip ci]'
+          git push --force origin HEAD:xwn4-export
