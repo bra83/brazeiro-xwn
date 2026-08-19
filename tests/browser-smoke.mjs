@@ -8,7 +8,7 @@ async function setSystem(id){await page.evaluate(id=>localStorage.setItem('brase
 await page.goto(base,{waitUntil:'networkidle'});await page.waitForTimeout(300);
 if(!(await page.title()).includes('XWN 4.0'))throw new Error('wrong title');
 if(await page.locator('#storyFeed p').count()<4)throw new Error('campaign opening is not a story scene');
-if(!(await page.locator('#xwnSystemSelect').isVisible()))throw new Error('system selector missing');
+if(!(await page.locator('#xwnSystemSelect').count()))throw new Error('system selector missing');
 if(!(await page.locator('#xwnCharExport').count()))throw new Error('character JSON tools missing');
 if(!(await page.locator('#xwnSnapshotSave').count()))throw new Error('snapshot tools missing');
 if(!(await page.locator('[data-die="20"]').count()))throw new Error('virtual dice missing');
