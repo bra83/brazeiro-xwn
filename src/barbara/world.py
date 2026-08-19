@@ -8,17 +8,29 @@ class WorldTick:
         if mutator: mutator(draft)
         self._process_events(draft); self._propagate_rumors(draft); self._update_npc_memory(draft); self._validate(draft)
         state.__dict__.clear(); state.__dict__.update(draft.__dict__); return state
+    def catch_up(self,state,target_tick):
+        if not isinstance(target_tick,int) or isinstance(target_tick,bool) or target_tick<state.tick: raise ValueError('invalid_target_tick')
+        while state.tick<target_tick: self.advance(state)
+        return state
+    def simulation_level(self,state,npc):
+        if not isinstance(npc,dict): return 'aggregate'
+        if npc.get('important') or npc.get('location')==state.location: return 'detailed'
+        if npc.get('faction') or npc.get('goals'): return 'agenda'
+        return 'aggregate'
     def _run_npcs(self,state):
         for npc in state.npcs.values():
             if not isinstance(npc,dict): continue
-            npc['last_simulated_tick']=state.tick
+            level=self.simulation_level(state,npc); npc['simulation_level']=level; npc['last_simulated_tick']=state.tick
             if npc.get('alive',True) is False: continue
+            goals=npc.get('goals',[])
+            if isinstance(goals,list) and goals: npc['active_goal']=deepcopy(goals[(state.tick-1)%len(goals)])
             routine=npc.get('routine',{})
             if isinstance(routine,dict):
                 slot=str(state.tick%24); dest=routine.get(slot,routine.get('default'))
                 if dest is not None: npc['location']=dest
-            goals=npc.get('goals',[])
-            if isinstance(goals,list) and goals: npc['active_goal']=deepcopy(goals[(state.tick-1)%len(goals)])
+            if level=='agenda':
+                agenda=npc.setdefault('agenda_progress',0)
+                if isinstance(agenda,int) and not isinstance(agenda,bool): npc['agenda_progress']=agenda+1
     def _run_factions(self,state):
         interval=state.world_flags.get('faction_turn_interval',1)
         if not isinstance(interval,int) or isinstance(interval,bool) or interval<1: raise ValueError('invalid_faction_turn_interval')
@@ -121,8 +133,7 @@ class WorldTick:
         out=[]
         for rumor in state.rumors:
             if state.location not in set(rumor.get('reached',[])): continue
-            r=deepcopy(rumor); r['confidence']=r.get('confidence_by_location',{}).get(str(state.location),r.get('confidence',0.5)); r.pop('truth_status',None)
-            out.append(r)
+            r=deepcopy(rumor); r['confidence']=r.get('confidence_by_location',{}).get(str(state.location),r.get('confidence',0.5)); r.pop('truth_status',None); out.append(r)
         return out
     def _validate(self,state):
         state.validate()
