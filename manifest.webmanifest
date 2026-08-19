@@ -1,5 +1,5 @@
 {
-  "name":"Braseiro XWN — WWN 3.0",
+  "name":"Braseiro XWN 4.0 — Motor Barbara",
   "short_name":"Braseiro XWN",
   "start_url":"./index.html",
   "scope":"./",
@@ -7,7 +7,7 @@
   "background_color":"#05080a",
   "theme_color":"#8fc7e8",
   "lang":"pt-BR",
-  "description":"Mesa viva de Worlds Without Number: atlas hex, Mestre actual-play, regras indexadas, mundo vivo e continuidade visual.",
+  "description":"Mesa viva Without Numbers com WWN e SWN homologados, domínios isolados, Motor Barbara, regras indexadas, áudio, snapshots, fichas JSON, mapas, tokens e continuidade.",
   "icons":[{"src":"assets/app-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}],
   "share_target":{
     "action":"./share-target/",
