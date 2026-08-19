@@ -66,7 +66,7 @@ class WorldTick:
     def _process_events(self,state):
         spawned=[]; due=[e for e in state.events if isinstance(e,dict) and e.get('due_tick',state.tick)<=state.tick and not e.get('resolved')]
         for event in due:
-            event['resolved']=True; self._apply_event_effects(state,event)
+            event['resolved']=True; event['resolved_tick']=state.tick; self._apply_event_effects(state,event)
             depth=int(event.get('depth',0)); children=list(event.get('spawn_events',[]))
             if depth>=self.MAX_DEPTH: children=[]; event['causal_limit']='depth'
             if len(children)>self.MAX_FANOUT: children=children[:self.MAX_FANOUT]; event['causal_limit']='fanout'
@@ -102,7 +102,7 @@ class WorldTick:
                     confidence[str(b)]=max(float(confidence.get(str(b),0.0)),new)
             rumor['reached']=sorted(reached,key=str); rumor['confidence_by_location']=confidence; rumor.setdefault('truth_status',truth)
     def _update_npc_memory(self,state):
-        resolved=[e for e in state.events if isinstance(e,dict) and e.get('resolved') and e.get('summary')]
+        resolved=[e for e in state.events if isinstance(e,dict) and e.get('resolved_tick')==state.tick and e.get('summary')]
         for npc in state.npcs.values():
             if not isinstance(npc,dict) or npc.get('alive',True) is False: continue
             loc=npc.get('location'); memory=npc.setdefault('memory',[]); heard=npc.setdefault('heard_rumors',[])
