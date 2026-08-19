@@ -1,4 +1,5 @@
 from copy import deepcopy
+import re
 from .security import public_view
 
 class Memory:
@@ -12,23 +13,21 @@ class Memory:
         if not isinstance(sal,(int,float)) or isinstance(sal,bool) or not 0<=sal<=1: raise ValueError('invalid_salience')
         state.memory.append(entry)
         if len(state.memory)>self.MAX_ITEMS:
-            # Retain highly salient memories plus the newest context; never mutate entries.
-            indexed=list(enumerate(state.memory))
-            keep_new={i for i,_ in indexed[-self.MAX_ITEMS//2:]}
-            older=indexed[:-self.MAX_ITEMS//2]
-            older.sort(key=lambda x:(-float(x[1].get('salience',0.5)),-int(x[1].get('tick',0)),x[0]))
-            keep_old={i for i,_ in older[:self.MAX_ITEMS-len(keep_new)]}
+            indexed=list(enumerate(state.memory)); keep_new={i for i,_ in indexed[-self.MAX_ITEMS//2:]}; older=indexed[:-self.MAX_ITEMS//2]
+            older.sort(key=lambda x:(-float(x[1].get('salience',0.5)),-int(x[1].get('tick',0)),x[0])); keep_old={i for i,_ in older[:self.MAX_ITEMS-len(keep_new)]}
             state.memory=[v for i,v in indexed if i in keep_new or i in keep_old]
-    def compact_context(self,state,limit=12):
+    def _tokens(self,value): return set(re.findall(r'\w+',str(value).lower()))
+    def compact_context(self,state,limit=12,query='',location=None):
         if not isinstance(limit,int) or isinstance(limit,bool) or limit<1: raise ValueError('invalid_memory_limit')
-        public=public_view(state.memory)
-        scored=[]
+        public=public_view(state.memory); q=self._tokens(query); scored=[]; now=state.tick
         for i,m in enumerate(public):
             if not isinstance(m,dict): continue
-            scored.append((float(m.get('salience',0.5)),int(m.get('tick',0)),i,m))
-        selected=sorted(scored,key=lambda x:(-x[0],-x[1],-x[2]))[:limit]
-        # Return selected memories chronologically so the narrator receives a coherent sequence.
-        selected.sort(key=lambda x:(x[1],x[2]))
+            sal=float(m.get('salience',0.5)); tick=int(m.get('tick',0)); text=m.get('text',m.get('summary',m.get('event',m)))
+            toks=self._tokens(text); relevance=(len(q&toks)/max(1,len(q))) if q else 0.0
+            loc=m.get('location'); locality=1.0 if location and loc==location else 0.0
+            recency=1.0/(1.0+max(0,now-tick)); score=0.45*sal+0.30*relevance+0.15*locality+0.10*recency
+            scored.append((score,tick,i,m))
+        selected=sorted(scored,key=lambda x:(-x[0],-x[1],-x[2]))[:limit]; selected.sort(key=lambda x:(x[1],x[2]))
         return deepcopy([x[3] for x in selected])
     def causal_trace(self,state,event_id):
         by={e.get('id'):e for e in state.events if isinstance(e,dict) and e.get('id') is not None}; out=[]; cur=by.get(event_id); seen=set()
