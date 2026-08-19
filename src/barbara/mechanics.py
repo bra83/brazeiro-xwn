@@ -23,9 +23,8 @@ class MechanicsAuthority:
             if k in resolution and (not isinstance(resolution[k],(int,float)) or isinstance(resolution[k],bool)):raise ValueError('invalid_resolution_number')
         for k in ('resolution_id','system_id','family','mechanic'):
             if k in resolution and (not isinstance(resolution[k],str) or not resolution[k]):raise ValueError('invalid_resolution_binding')
-        effects=resolution.get('effects',[])
-        if not isinstance(effects,list):raise ValueError('invalid_resolution_effects')
-        out=deepcopy(resolution); out['source']=source; out['effects']=deepcopy(effects); return out
+        if 'effects' in resolution and not isinstance(resolution['effects'],list):raise ValueError('invalid_resolution_effects')
+        out=deepcopy(resolution); out['source']=source; return out
     def validate_narration(self,narration,check_required=False,resolution=None):
         if not check_required or resolution is not None:return True
         rendered=str(narration).lower()
