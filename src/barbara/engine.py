@@ -4,7 +4,7 @@ from .rag import RAG
 from .rules import RuleGate
 from .world import WorldTick
 from .memory import Memory
-from .security import public_view,validate_patch
+from .security import public_view
 from .recovery import RecoveryPolicy
 from .narrative import NarrativePolicy
 from .knowledge import KnowledgeBoundary
@@ -72,10 +72,11 @@ class BarbaraEngine:
         return public_view({'location':state.location,'facts':state.facts,'memory':memories,'rumors':self.world.visible_rumors(state),'npcs':self.knowledge.visible_npcs(state),'site':world['site'],'public_ledger':world['ledger'],'world_state_for_dramatization':{'weather':state.weather,'economy':state.economy},'world_experience':{'occasion':occasion,'player_has_preexisting_local_knowledge':occasion not in {'campaign_opening','first_arrival'},'instruction':'Transform current world state into perceivable fiction. Do not report hidden/global state as a briefing.'},'evidence':safe,'resolution':deepcopy(resolution),'system_profile':self._system_profile(state),'narrative_policy':self.narrative.narrator_directives(importance,qcount,turn_plan)})
     def _validate_provider_output(self,out,state,evidence,context,user_text,importance='normal',plan=None,resolution=None):
         legacy_string=isinstance(out,str); legacy_opt_out=bool(legacy_string and getattr(self.provider,'legacy_text',False))
-        if legacy_string:out={'narration':out,'claims':[],'state_patch':[]}
+        if legacy_string:out={'narration':out,'claims':[]}
         if not isinstance(out,dict):raise ValueError('invalid_provider_output')
         if set(out)-{'narration','claims','state_patch'}:raise ValueError('unknown_provider_field')
         narration=out.get('narration'); claims=out.get('claims',[]); patches=out.get('state_patch',[])
+        if patches not in (None,[]):raise ValueError('provider_state_patch_forbidden')
         if not isinstance(narration,str) or not narration.strip() or len(narration)>self.MAX_NARRATION:raise ValueError('invalid_narration')
         if len(narration)<self.narrative.minimum_acceptable_chars(importance):raise ValueError('narrativa_resumida_demais')
         self.narrative.validate_player_agency(user_text,narration); self.mechanics.validate_narration(narration,bool(plan and plan.get('check_required')),resolution)
@@ -83,25 +84,7 @@ class BarbaraEngine:
             self.narrative.validate_response_coverage(user_text,narration); self.narrative.validate_scene_ending(narration,importance)
             if getattr(self.provider,'enforce_story_contract',False):self.narrative.validate_story_obligation(narration,(plan or {}).get('story_obligation','continuation'))
         claims=self.grounding.validate(claims,state,evidence,self.world.visible_rumors(state),public_context=context)
-        if not isinstance(patches,list):raise ValueError('invalid_state_patch')
-        for p in patches:
-            if not isinstance(p,dict) or set(p)!={'path','value'}:raise ValueError('invalid_patch_entry')
-            validate_patch(p['path'],p['value'])
-        return {'narration':narration,'claims':deepcopy(claims),'state_patch':deepcopy(patches)}
-    def _apply_patches(self,state,patches):
-        for p in patches:
-            parts=p['path'].split('.'); root=parts.pop(0)
-            if root.startswith('player_'):target=state.player_state; parts.insert(0,root)
-            elif root in {'scene','notes'}:target=getattr(state,root)
-            else:raise ValueError('patch_root_not_committable')
-            if not parts:raise ValueError('patch_requires_leaf')
-            for key in parts[:-1]:
-                current=target.get(key)
-                if current is None:target[key]={}; current=target[key]
-                if not isinstance(current,dict):raise ValueError('patch_path_type_conflict')
-                target=current
-            target[parts[-1]]=deepcopy(p['value'])
-        state.validate()
+        return {'narration':narration,'claims':deepcopy(claims)}
     def _remember_request(self,state,request_id,fingerprint,result):
         state.request_log[request_id]={'fingerprint':deepcopy(fingerprint),'result':deepcopy(result)}
         if len(state.request_log)>self.MAX_REQUEST_LOG:
@@ -124,7 +107,7 @@ class BarbaraEngine:
             if plan['world_advances']:self.world.advance(state)
             context=self.narrator_context(state,evidence,text,importance,plan,trusted_resolution); result={'tick':state.tick,'evidence':[e.checksum for e in evidence],'text':text,'mode':plan['mode'],'world_advanced':plan['world_advances'],'importance':importance,'system_profile':profile,'turn_plan':deepcopy(plan),'presentation':deepcopy(plan['channels']),'resolution':deepcopy(trusted_resolution)}
             if self.provider:
-                raw=self.recovery.run(lambda:self.provider.generate(text,context,state)); validated=self._validate_provider_output(raw,state,evidence,context,text,importance,plan,trusted_resolution); self._apply_patches(state,validated['state_patch']); result.update(validated)
+                raw=self.recovery.run(lambda:self.provider.generate(text,context,state)); validated=self._validate_provider_output(raw,state,evidence,context,text,importance,plan,trusted_resolution); result.update(validated)
             self._mark_discovery(state,plan); self._remember_request(state,request_id,fingerprint,result); state.validate(); self._bind_request(state,request_id,fingerprint,result)
         except Exception as exc:
             state.__dict__.clear(); state.__dict__.update(before.__dict__); self.telemetry.record('reject',self._error_code(exc),campaign=state.campaign_id,system=state.system_id); raise
