@@ -8,15 +8,23 @@ class Adapter:
     family:str
     rules_required:bool=True
     lore_scope:str|None=None
+    min_rule_authority:float=0.5
     def validate_campaign(self,state):
         if state.system_id!=self.system_id: raise ValueError('adapter_system_mismatch')
         return True
     def rules_ready(self,rag,campaign_id):
         if not self.rules_required: return True
-        # Readiness means at least one canonical RULE exists in the exact campaign/system scope.
         for (c,s,_,_),e in rag._docs.items():
-            if c==campaign_id and s==self.system_id and e.kind=='RULE' and not e.secret and e.authority>0: return True
+            if c==campaign_id and s==self.system_id and e.kind=='RULE' and not e.secret and e.authority>=self.min_rule_authority: return True
         return False
+    def narrator_profile(self,rag,campaign_id):
+        return {
+            'system_id':self.system_id,
+            'family':self.family,
+            'lore_scope':self.lore_scope,
+            'rules_ready':self.rules_ready(rag,campaign_id),
+            'min_rule_authority':self.min_rule_authority,
+        }
 
 class AdapterRegistry:
     def __init__(self):
