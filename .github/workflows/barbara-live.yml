@@ -29,6 +29,26 @@ jobs:
         run: python -m pytest -q
       - name: Build wheel
         run: python -m build --wheel
+      - name: Build Android embedding bundle
+        run: python tools/build_android_bundle.py dist/motor_barbara-1.0.0-py3-none-any.whl
+      - name: Verify Android bundle integrity
+        run: |
+          python - <<'PY'
+          import hashlib,json,zipfile
+          from pathlib import Path
+          bundle=Path('dist/motor-barbara-android-1.0.0.zip')
+          assert bundle.is_file()
+          with zipfile.ZipFile(bundle) as z:
+              names=set(z.namelist())
+              required={'python/motor_barbara-1.0.0-py3-none-any.whl','kotlin/BarbaraGateway.kt','ANDROID_INTEGRATION.md','barbara-android-manifest.json'}
+              assert required <= names
+              m=json.loads(z.read('barbara-android-manifest.json'))
+              wheel=z.read('python/motor_barbara-1.0.0-py3-none-any.whl')
+              assert hashlib.sha256(wheel).hexdigest()==m['wheel_sha256']
+              assert m['source_commit']=='${{ github.sha }}'
+              assert m['version']=='1.0.0' and len(m['supported_systems'])==12
+          print('android embedding bundle OK')
+          PY
       - name: Clean-install wheel smoke
         run: |
           python -m venv /tmp/barbara-clean
@@ -46,12 +66,13 @@ jobs:
           assert r['tick'] == 1 and s.tick == 1
           print('clean wheel smoke OK', barbara.__version__)
           PY
-      - name: Publish Barbara 1.0 installable artifact
+      - name: Publish Barbara 1.0 installable artifacts
         uses: actions/upload-artifact@v4
         with:
           name: motor-barbara-1.0.0
           path: |
             dist/motor_barbara-1.0.0-py3-none-any.whl
+            dist/motor-barbara-android-1.0.0.zip
             docs/RELEASE_1_0_ACCEPTANCE.md
             docs/RELEASE_NOTES_1.0.md
           if-no-files-found: error
