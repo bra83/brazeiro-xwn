@@ -14,6 +14,7 @@ for s in required_scripts:
     pos.append(idx.index(f'src="{s}"'))
 ok(pos==sorted(pos),'script order is unsafe')
 for p in required_scripts: ok((ROOT/p).is_file(),f'missing runtime file {p}')
+ok((ROOT/'xwn4-rules-fix.js').is_file(),'missing XWN 3.7 rules boundary repair')
 for p in ['assets/domain/space.svg','assets/domain/urban.svg','assets/domain/wasteland.svg']:
     ok((ROOT/p).is_file(),f'missing asset {p}')
     s=text(p);ok('width="224"' in s and 'height="194"' in s,f'bad domain tile dimensions {p}')
@@ -24,7 +25,7 @@ ok('[hidden]{display:none!important}' in (css+ui).replace(' ',''),'hidden CSS in
 ok('BRASEIRO XWN 4.0' in idx,'visible version missing')
 ok('Motor Barbara' in manifest['name'],'manifest not Barbara-branded')
 ok(manifest.get('share_target',{}).get('method')=='POST','share target lost')
-for s in required_scripts+['assets/domain/space.svg','assets/domain/urban.svg','assets/domain/wasteland.svg']:
+for s in required_scripts+['xwn4-rules-fix.js','assets/domain/space.svg','assets/domain/urban.svg','assets/domain/wasteland.svg']:
     ok(("./"+s) in sw,f'service worker missing {s}')
 ok("braseiro-xwn-v400-barbara" in sw,'service worker cache not versioned')
 lib=text('hex-library.js')
@@ -42,17 +43,17 @@ ok("WWN:{" in systems and "corpusReady:true" in systems,'WWN rules not ready')
 ok("SWN:{" in systems and systems.count('corpusReady:true')>=2,'SWN rules not ready')
 ok("CWN:{" in systems and "corpusReady:false" in systems,'CWN fail-closed profile missing')
 ok("AWN:{" in systems and systems.count('corpusReady:false')>=2,'AWN fail-closed profile missing')
-runtime=text('xwn4-runtime.js');barbara=text('barbara-browser.js');gm=text('gmBridge.js');mechanics=text('xwn4-mechanics-fix.js')
+runtime=text('xwn4-runtime.js');barbara=text('barbara-browser.js');gm=text('gmBridge.js');mechanics=text('xwn4-mechanics-fix.js');rulefix=text('xwn4-rules-fix.js')
 ok("a31fdb9f9e361fc81b6a5f25c7646450311d0ce3" in runtime and "a31fdb9f9e361fc81b6a5f25c7646450311d0ce3" in barbara,'Barbara pin mismatch')
 for invariant in ['campaign_opening','first_arrival','changed_return','player_knows_only_experienced_world','dramatize_world_instead_of_reporting_it']:
     ok(invariant in barbara,f'Barbara narrative invariant missing {invariant}')
 ok('BarbaraBrowser.validate' in gm and 'BarbaraBrowser.commitExperience' in gm,'Gemini bypasses Barbara validator')
+ok("s.src='xwn4-rules-fix.js'" in gm,'browser host does not activate XWN 3.7 rule repair')
+ok(r'\bmoral\b' in rulefix and r'\bataque\b' in rulefix and r'\bacertar\b' in rulefix,'functional word-boundary repair incomplete')
 ok('indexedDB' in text('local-audio-library.js'),'local audio persistence missing')
 ok('indexedDB' in text('snapshot-store.js'),'snapshot persistence missing')
 ok('twoHanded' in mechanics and 'ammo' in mechanics,'SWN portable weapon metadata missing')
 for feature in ['Exportar ficha JSON','Importar ficha JSON','Salvar snapshot local','DADOS VIRTUAIS','MÚSICA / AMBIÊNCIA LOCAL','COMBATE TÁTICO SWN']:
     ok(feature in ui,f'parity UI missing {feature}')
-for bad in ['\x08moral','\x08ataque','\x08acertar']:
-    ok(bad not in text('engine.js'),'control-character regex regression returned')
 ok('xwn4-migration.js' in sw,'save migration not cached')
 print(f'XWN4 static parity audit OK: {checks} checks, {len(entries)} WWN visual variants')
